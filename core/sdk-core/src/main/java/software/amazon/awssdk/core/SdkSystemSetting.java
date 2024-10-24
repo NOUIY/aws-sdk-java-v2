@@ -220,6 +220,18 @@ public enum SdkSystemSetting implements SystemSetting {
      */
     AWS_REQUEST_MIN_COMPRESSION_SIZE_BYTES("aws.requestMinCompressionSizeBytes", null),
 
+    /**
+     * Defines a file path from which partition metadata should be loaded. If this isn't specified, the partition
+     * metadata deployed with the SDK client will be used instead.
+     */
+    AWS_PARTITIONS_FILE("aws.partitionsFile", null),
+
+    /**
+     * Configure an optional identification value to be appended to the user agent header.
+     * The value should be less than 50 characters in length and is null by default.
+     */
+    AWS_SDK_UA_APP_ID("sdk.ua.appId", null)
+
     ;
 
     private final String systemProperty;

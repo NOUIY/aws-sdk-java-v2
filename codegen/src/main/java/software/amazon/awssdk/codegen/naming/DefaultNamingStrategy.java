@@ -114,19 +114,42 @@ public class DefaultNamingStrategy implements NamingStrategy {
 
     @Override
     public String getServiceName() {
-        String baseName = Stream.of(serviceModel.getMetadata().getServiceId())
-                                .filter(Objects::nonNull)
-                                .filter(s -> !s.trim().isEmpty())
-                                .findFirst()
-                                .orElseThrow(() -> new IllegalStateException("ServiceId is missing in the c2j model."));
-
+        String baseName = serviceId();
         baseName = pascalCase(baseName);
+        baseName = removeRedundantPrefixesAndSuffixes(baseName);
+        return baseName;
+    }
 
-        // Special cases
-        baseName = Utils.removeLeading(baseName, "Amazon");
-        baseName = Utils.removeLeading(baseName, "Aws");
-        baseName = Utils.removeTrailing(baseName, "Service");
+    @Override
+    public String getServiceNameForEnvironmentVariables() {
+        String baseName = serviceId();
+        baseName = baseName.replace(' ', '_');
+        baseName = StringUtils.upperCase(baseName);
+        return baseName;
+    }
 
+    @Override
+    public String getServiceNameForSystemProperties() {
+        return getServiceName();
+    }
+
+    @Override
+    public String getServiceNameForProfileFile() {
+        return StringUtils.lowerCase(getServiceNameForEnvironmentVariables());
+    }
+
+    private String serviceId() {
+        return Stream.of(serviceModel.getMetadata().getServiceId())
+                     .filter(Objects::nonNull)
+                     .filter(s -> !s.trim().isEmpty())
+                     .findFirst()
+                     .orElseThrow(() -> new IllegalStateException("ServiceId is missing in the c2j model."));
+    }
+
+    private static String removeRedundantPrefixesAndSuffixes(String baseName) {
+        baseName = Utils.removeLeading(baseName, "amazon");
+        baseName = Utils.removeLeading(baseName, "aws");
+        baseName = Utils.removeTrailing(baseName, "service");
         return baseName;
     }
 
@@ -187,6 +210,11 @@ public class DefaultNamingStrategy implements NamingStrategy {
     @Override
     public String getJmesPathPackageName(String serviceName) {
         return getCustomizedPackageName(concatServiceNameIfShareModel(serviceName), Constant.PACKAGE_NAME_JMESPATH_PATTERN);
+    }
+
+    @Override
+    public String getBatchManagerPackageName(String serviceName) {
+        return getCustomizedPackageName(concatServiceNameIfShareModel(serviceName), Constant.PACKAGE_NAME_BATCHMANAGER_PATTERN);
     }
 
     @Override
@@ -272,7 +300,7 @@ public class DefaultNamingStrategy implements NamingStrategy {
         String result = enumValue;
 
         // Special cases
-        result = result.replaceAll("textORcsv", "TEXT_OR_CSV");
+        result = result.replace("textORcsv", "TEXT_OR_CSV");
 
         // Split into words
         result = String.join("_", splitOnWordBoundaries(result));
@@ -393,7 +421,7 @@ public class DefaultNamingStrategy implements NamingStrategy {
 
     private boolean isDisallowedNameForShape(String name, Shape parentShape) {
         // Reserve the name "type" for union shapes.
-        if (parentShape.isUnion() && name.equals("type")) {
+        if (parentShape.isUnion() && "type".equals(name)) {
             return true;
         }
 

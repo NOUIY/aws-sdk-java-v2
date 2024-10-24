@@ -5,13 +5,15 @@
     "endpointPrefix":"memory-db",
     "jsonVersion":"1.1",
     "protocol":"json",
+    "protocols":["json"],
     "serviceAbbreviation":"Amazon MemoryDB",
     "serviceFullName":"Amazon MemoryDB",
     "serviceId":"MemoryDB",
     "signatureVersion":"v4",
     "signingName":"memorydb",
     "targetPrefix":"AmazonMemoryDB",
-    "uid":"memorydb-2021-01-01"
+    "uid":"memorydb-2021-01-01",
+    "auth":["aws.auth#sigv4"]
   },
   "operations":{
     "BatchUpdateCluster":{
@@ -311,7 +313,7 @@
         {"shape":"InvalidParameterValueException"},
         {"shape":"InvalidParameterCombinationException"}
       ],
-      "documentation":"<p>Returns a list of the available Redis engine versions.</p>"
+      "documentation":"<p>Returns a list of the available engine versions.</p>"
     },
     "DescribeEvents":{
       "name":"DescribeEvents",
@@ -916,13 +918,17 @@
           "shape":"String",
           "documentation":"<p>The cluster's node type</p>"
         },
+        "Engine":{
+          "shape":"String",
+          "documentation":"<p> The Redis OSS or Valkey engine used by the cluster.</p>"
+        },
         "EngineVersion":{
           "shape":"String",
           "documentation":"<p>The Redis engine version used by the cluster</p>"
         },
         "EnginePatchVersion":{
           "shape":"String",
-          "documentation":"<p>The Redis engine patch version used by the cluster</p>"
+          "documentation":"<p>The engine patch version used by the cluster</p>"
         },
         "ParameterGroupName":{
           "shape":"String",
@@ -1009,9 +1015,13 @@
           "shape":"String",
           "documentation":"<p>The node type used for the cluster</p>"
         },
+        "Engine":{
+          "shape":"String",
+          "documentation":"<p>The configuration for the Redis OSS or Valkey engine used by the cluster.</p>"
+        },
         "EngineVersion":{
           "shape":"String",
-          "documentation":"<p>The Redis engine version used by the cluster</p>"
+          "documentation":"<p>The engine version used by the cluster</p>"
         },
         "MaintenanceWindow":{
           "shape":"String",
@@ -1246,9 +1256,13 @@
           "shape":"ACLName",
           "documentation":"<p>The name of the Access Control List to associate with the cluster.</p>"
         },
+        "Engine":{
+          "shape":"String",
+          "documentation":"<p>The name of the engine to be used for the nodes in this cluster. The value must be set to either Redis or Valkey.</p>"
+        },
         "EngineVersion":{
           "shape":"String",
-          "documentation":"<p>The version number of the Redis engine to be used for the cluster.</p>"
+          "documentation":"<p>The version number of the engine to be used for the cluster.</p>"
         },
         "AutoMinorVersionUpgrade":{
           "shape":"BooleanOptional",
@@ -1605,9 +1619,13 @@
     "DescribeEngineVersionsRequest":{
       "type":"structure",
       "members":{
+        "Engine":{
+          "shape":"String",
+          "documentation":"<p>The engine version to return. Valid values are either valkey or redis.</p>"
+        },
         "EngineVersion":{
           "shape":"String",
-          "documentation":"<p>The Redis engine version</p>"
+          "documentation":"<p>The engine version.</p>"
         },
         "ParameterGroupFamily":{
           "shape":"String",
@@ -2004,6 +2022,10 @@
     "EngineVersionInfo":{
       "type":"structure",
       "members":{
+        "Engine":{
+          "shape":"String",
+          "documentation":"<p>The version of the Redis OSS or Valkey engine used by the cluster.</p>"
+        },
         "EngineVersion":{
           "shape":"String",
           "documentation":"<p>The engine version</p>"
@@ -2017,7 +2039,7 @@
           "documentation":"<p>Specifies the name of the parameter group family to which the engine default parameters apply.</p>"
         }
       },
-      "documentation":"<p>Provides details of the Redis engine version</p>"
+      "documentation":"<p>Provides details of the engine version.</p>"
     },
     "EngineVersionInfoList":{
       "type":"list",
@@ -2720,6 +2742,10 @@
           "shape":"ServiceUpdateType",
           "documentation":"<p>Reflects the nature of the service update</p>"
         },
+        "Engine":{
+          "shape":"String",
+          "documentation":"<p>The MemoryDB engine to which the update applies. The values are either Redis or Valkey.</p>"
+        },
         "NodesUpdated":{
           "shape":"String",
           "documentation":"<p>A list of nodes updated by the service update</p>"
@@ -3240,6 +3266,10 @@
         "NodeType":{
           "shape":"String",
           "documentation":"<p>A valid node type that you want to scale this cluster up or down to.</p>"
+        },
+        "Engine":{
+          "shape":"String",
+          "documentation":"<p>The name of the engine to be used for the nodes in this cluster. The value must be set to either Redis or Valkey.</p>"
         },
         "EngineVersion":{
           "shape":"String",

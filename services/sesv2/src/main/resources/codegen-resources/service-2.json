@@ -11,7 +11,8 @@
     "serviceId":"SESv2",
     "signatureVersion":"v4",
     "signingName":"ses",
-    "uid":"sesv2-2019-09-27"
+    "uid":"sesv2-2019-09-27",
+    "auth":["aws.auth#sigv4"]
   },
   "operations":{
     "BatchGetMetricData":{
@@ -78,7 +79,7 @@
         {"shape":"TooManyRequestsException"},
         {"shape":"BadRequestException"}
       ],
-      "documentation":"<p>Create an event destination. <i>Events</i> include message sends, deliveries, opens, clicks, bounces, and complaints. <i>Event destinations</i> are places that you can send information about these events to. For example, you can send event data to Amazon SNS to receive notifications when you receive bounces or complaints, or you can use Amazon Kinesis Data Firehose to stream data to Amazon S3 for long-term storage.</p> <p>A single configuration set can include more than one event destination.</p>"
+      "documentation":"<p>Create an event destination. <i>Events</i> include message sends, deliveries, opens, clicks, bounces, and complaints. <i>Event destinations</i> are places that you can send information about these events to. For example, you can send event data to Amazon EventBridge and associate a rule to send the event to the specified target.</p> <p>A single configuration set can include more than one event destination.</p>"
     },
     "CreateContact":{
       "name":"CreateContact",
@@ -278,7 +279,7 @@
         {"shape":"TooManyRequestsException"},
         {"shape":"BadRequestException"}
       ],
-      "documentation":"<p>Delete an event destination.</p> <p> <i>Events</i> include message sends, deliveries, opens, clicks, bounces, and complaints. <i>Event destinations</i> are places that you can send information about these events to. For example, you can send event data to Amazon SNS to receive notifications when you receive bounces or complaints, or you can use Amazon Kinesis Data Firehose to stream data to Amazon S3 for long-term storage.</p>"
+      "documentation":"<p>Delete an event destination.</p> <p> <i>Events</i> include message sends, deliveries, opens, clicks, bounces, and complaints. <i>Event destinations</i> are places that you can send information about these events to. For example, you can send event data to Amazon EventBridge and associate a rule to send the event to the specified target.</p>"
     },
     "DeleteContact":{
       "name":"DeleteContact",
@@ -460,7 +461,7 @@
         {"shape":"TooManyRequestsException"},
         {"shape":"BadRequestException"}
       ],
-      "documentation":"<p>Retrieve a list of event destinations that are associated with a configuration set.</p> <p> <i>Events</i> include message sends, deliveries, opens, clicks, bounces, and complaints. <i>Event destinations</i> are places that you can send information about these events to. For example, you can send event data to Amazon SNS to receive notifications when you receive bounces or complaints, or you can use Amazon Kinesis Data Firehose to stream data to Amazon S3 for long-term storage.</p>"
+      "documentation":"<p>Retrieve a list of event destinations that are associated with a configuration set.</p> <p> <i>Events</i> include message sends, deliveries, opens, clicks, bounces, and complaints. <i>Event destinations</i> are places that you can send information about these events to. For example, you can send event data to Amazon EventBridge and associate a rule to send the event to the specified target.</p>"
     },
     "GetContact":{
       "name":"GetContact",
@@ -1352,7 +1353,7 @@
         {"shape":"TooManyRequestsException"},
         {"shape":"BadRequestException"}
       ],
-      "documentation":"<p>Update the configuration of an event destination for a configuration set.</p> <p> <i>Events</i> include message sends, deliveries, opens, clicks, bounces, and complaints. <i>Event destinations</i> are places that you can send information about these events to. For example, you can send event data to Amazon SNS to receive notifications when you receive bounces or complaints, or you can use Amazon Kinesis Data Firehose to stream data to Amazon S3 for long-term storage.</p>"
+      "documentation":"<p>Update the configuration of an event destination for a configuration set.</p> <p> <i>Events</i> include message sends, deliveries, opens, clicks, bounces, and complaints. <i>Event destinations</i> are places that you can send information about these events to. For example, you can send event data to Amazon EventBridge and associate a rule to send the event to the specified target.</p>"
     },
     "UpdateContact":{
       "name":"UpdateContact",
@@ -2761,6 +2762,10 @@
         "SendingPoolName":{
           "shape":"PoolName",
           "documentation":"<p>The name of the dedicated IP pool to associate with the configuration set.</p>"
+        },
+        "MaxDeliverySeconds":{
+          "shape":"MaxDeliverySeconds",
+          "documentation":"<p>The maximum amount of time, in seconds, that Amazon SES API v2 will attempt delivery of email. If specified, the value must greater than or equal to 300 seconds (5 minutes) and less than or equal to 50400 seconds (840 minutes). </p>"
         }
       },
       "documentation":"<p>Used to associate a configuration set with a dedicated IP pool.</p>"
@@ -3145,6 +3150,17 @@
       "type":"list",
       "member":{"shape":"Esp"}
     },
+    "EventBridgeDestination":{
+      "type":"structure",
+      "required":["EventBusArn"],
+      "members":{
+        "EventBusArn":{
+          "shape":"AmazonResourceName",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the Amazon EventBridge bus to publish email events to. Only the default bus is supported. </p>"
+        }
+      },
+      "documentation":"<p>An object that defines an Amazon EventBridge destination for email events. You can use Amazon EventBridge to send notifications when certain email events occur.</p>"
+    },
     "EventDestination":{
       "type":"structure",
       "required":[
@@ -3174,7 +3190,11 @@
         },
         "SnsDestination":{
           "shape":"SnsDestination",
-          "documentation":"<p>An object that defines an Amazon SNS destination for email events. You can use Amazon SNS to send notification when certain email events occur.</p>"
+          "documentation":"<p>An object that defines an Amazon SNS destination for email events. You can use Amazon SNS to send notifications when certain email events occur.</p>"
+        },
+        "EventBridgeDestination":{
+          "shape":"EventBridgeDestination",
+          "documentation":"<p>An object that defines an Amazon EventBridge destination for email events. You can use Amazon EventBridge to send notifications when certain email events occur.</p>"
         },
         "PinpointDestination":{
           "shape":"PinpointDestination",
@@ -3204,7 +3224,11 @@
         },
         "SnsDestination":{
           "shape":"SnsDestination",
-          "documentation":"<p>An object that defines an Amazon SNS destination for email events. You can use Amazon SNS to send notification when certain email events occur.</p>"
+          "documentation":"<p>An object that defines an Amazon SNS destination for email events. You can use Amazon SNS to send notifications when certain email events occur.</p>"
+        },
+        "EventBridgeDestination":{
+          "shape":"EventBridgeDestination",
+          "documentation":"<p>An object that defines an Amazon EventBridge destination for email events. You can use Amazon EventBridge to send notifications when certain email events occur.</p>"
         },
         "PinpointDestination":{
           "shape":"PinpointDestination",
@@ -4210,6 +4234,15 @@
       },
       "documentation":"<p>An object containing additional settings for your VDM configuration as applicable to the Guardian.</p>"
     },
+    "HttpsPolicy":{
+      "type":"string",
+      "documentation":"<p>The https policy to use for tracking open and click events. If the value is OPTIONAL or HttpsPolicy is not specified, the open trackers use HTTP and click tracker use the original protocol of the link. If the value is REQUIRE, both open and click tracker uses HTTPS and if the value is REQUIRE_OPEN_ONLY open tracker uses HTTPS and link tracker is same as original protocol of the link. </p>",
+      "enum":[
+        "REQUIRE",
+        "REQUIRE_OPEN_ONLY",
+        "OPTIONAL"
+      ]
+    },
     "Identity":{
       "type":"string",
       "min":1
@@ -5076,6 +5109,11 @@
       ]
     },
     "Max24HourSend":{"type":"double"},
+    "MaxDeliverySeconds":{
+      "type":"long",
+      "max":50400,
+      "min":300
+    },
     "MaxItems":{"type":"integer"},
     "MaxSendRate":{"type":"double"},
     "Message":{
@@ -5489,8 +5527,7 @@
       "type":"structure",
       "required":[
         "MailType",
-        "WebsiteURL",
-        "UseCaseDescription"
+        "WebsiteURL"
       ],
       "members":{
         "MailType":{
@@ -5591,6 +5628,10 @@
         "SendingPoolName":{
           "shape":"SendingPoolName",
           "documentation":"<p>The name of the dedicated IP pool to associate with the configuration set.</p>"
+        },
+        "MaxDeliverySeconds":{
+          "shape":"MaxDeliverySeconds",
+          "documentation":"<p>The maximum amount of time, in seconds, that Amazon SES API v2 will attempt delivery of email. If specified, the value must greater than or equal to 300 seconds (5 minutes) and less than or equal to 50400 seconds (840 minutes). </p>"
         }
       },
       "documentation":"<p>A request to associate a configuration set with a dedicated IP pool.</p>"
@@ -5683,7 +5724,8 @@
         "CustomRedirectDomain":{
           "shape":"CustomRedirectDomain",
           "documentation":"<p>The domain to use to track open and click events.</p>"
-        }
+        },
+        "HttpsPolicy":{"shape":"HttpsPolicy"}
       },
       "documentation":"<p>A request to add a custom domain for tracking open and click events to a configuration set.</p>"
     },
@@ -6369,7 +6411,7 @@
           "documentation":"<p>The Amazon Resource Name (ARN) of the Amazon SNS topic to publish email events to. For more information about Amazon SNS topics, see the <a href=\"https://docs.aws.amazon.com/sns/latest/dg/CreateTopic.html\">Amazon SNS Developer Guide</a>.</p>"
         }
       },
-      "documentation":"<p>An object that defines an Amazon SNS destination for email events. You can use Amazon SNS to send notification when certain email events occur.</p>"
+      "documentation":"<p>An object that defines an Amazon SNS destination for email events. You can use Amazon SNS to send notifications when certain email events occur.</p>"
     },
     "Subject":{"type":"string"},
     "SubscriptionStatus":{
@@ -6705,6 +6747,10 @@
         "CustomRedirectDomain":{
           "shape":"CustomRedirectDomain",
           "documentation":"<p>The domain to use for tracking open and click events.</p>"
+        },
+        "HttpsPolicy":{
+          "shape":"HttpsPolicy",
+          "documentation":"<p>The https policy to use for tracking open and click events.</p>"
         }
       },
       "documentation":"<p>An object that defines the tracking options for a configuration set. When you use the Amazon SES API v2 to send an email, it contains an invisible image that's used to track when recipients open your email. If your email contains links, those links are changed slightly in order to track when recipients click them.</p> <p>These images and links include references to a domain operated by Amazon Web Services. You can optionally configure the Amazon SES to use a domain that you operate for these images and links.</p>"
@@ -6939,8 +6985,9 @@
     },
     "UseCaseDescription":{
       "type":"string",
+      "deprecated":true,
+      "deprecatedMessage":"Use case description is optional and deprecated",
       "max":5000,
-      "min":1,
       "sensitive":true
     },
     "UseDefaultIfPreferenceUnavailable":{"type":"boolean"},

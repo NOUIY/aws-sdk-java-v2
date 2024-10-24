@@ -2,6 +2,7 @@
   "version":"2.0",
   "metadata":{
     "apiVersion":"2023-11-27",
+    "auth":["aws.auth#sigv4"],
     "endpointPrefix":"qbusiness",
     "protocol":"rest-json",
     "protocolSettings":{"h2":"eventstream"},
@@ -110,7 +111,7 @@
         {"shape":"AccessDeniedException"},
         {"shape":"ServiceQuotaExceededException"}
       ],
-      "documentation":"<p>Creates an Amazon Q Business application.</p> <note> <p>There are new tiers for Amazon Q Business. Not all features in Amazon Q Business Pro are also available in Amazon Q Business Lite. For information on what's included in Amazon Q Business Lite and what's included in Amazon Q Business Pro, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/what-is.html#tiers\">Amazon Q Business tiers</a>. You must use the Amazon Q Business console to assign subscription tiers to users.</p> </note>",
+      "documentation":"<p>Creates an Amazon Q Business application.</p> <note> <p>There are new tiers for Amazon Q Business. Not all features in Amazon Q Business Pro are also available in Amazon Q Business Lite. For information on what's included in Amazon Q Business Lite and what's included in Amazon Q Business Pro, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/tiers.html#user-sub-tiers\">Amazon Q Business tiers</a>. You must use the Amazon Q Business console to assign subscription tiers to users.</p> </note>",
       "idempotent":true
     },
     "CreateDataSource":{
@@ -1344,6 +1345,10 @@
           "shape":"String",
           "documentation":"<p>The expected data format for the action review input field value. For example, in PTO request, <code>from</code> and <code>to</code> would be of <code>datetime</code> allowed format. </p>"
         },
+        "arrayItemJsonSchema":{
+          "shape":"ActionReviewPayloadFieldArrayItemJsonSchema",
+          "documentation":"<p>Use to create a custom form with array fields (fields with nested objects inside an array). </p>"
+        },
         "required":{
           "shape":"Boolean",
           "documentation":"<p>Information about whether the field is required.</p>"
@@ -1368,6 +1373,12 @@
     "ActionReviewPayloadFieldAllowedValues":{
       "type":"list",
       "member":{"shape":"ActionReviewPayloadFieldAllowedValue"}
+    },
+    "ActionReviewPayloadFieldArrayItemJsonSchema":{
+      "type":"structure",
+      "members":{
+      },
+      "document":true
     },
     "AmazonResourceName":{
       "type":"string",
@@ -1396,6 +1407,10 @@
         "status":{
           "shape":"ApplicationStatus",
           "documentation":"<p>The status of the Amazon Q Business application. The application is ready to use when the status is <code>ACTIVE</code>.</p>"
+        },
+        "identityType":{
+          "shape":"IdentityType",
+          "documentation":"<p>The authentication type being used by a Amazon Q Business application.</p>"
         }
       },
       "documentation":"<p>Summary information for an Amazon Q Business application.</p>"
@@ -1562,7 +1577,7 @@
         },
         "containsAny":{
           "shape":"DocumentAttribute",
-          "documentation":"<p>Returns <code>true</code> when a document contains any of the specified document attributes or metadata fields. Supported for the following <a href=\"https://docs.aws.amazon.com/amazonq/latest/api-reference/API_DocumentAttributeValue.html\">document attribute value types</a>: <code>dateValue</code>, <code>longValue</code>, <code>stringListValue</code> and <code>stringValue</code>.</p>"
+          "documentation":"<p>Returns <code>true</code> when a document contains any of the specified document attributes or metadata fields. Supported for the following <a href=\"https://docs.aws.amazon.com/amazonq/latest/api-reference/API_DocumentAttributeValue.html\">document attribute value types</a>: <code>stringListValue</code>.</p>"
         },
         "greaterThan":{
           "shape":"DocumentAttribute",
@@ -1660,6 +1675,28 @@
       "type":"map",
       "key":{"shape":"AuthResponseKey"},
       "value":{"shape":"AuthResponseValue"}
+    },
+    "AutoSubscriptionConfiguration":{
+      "type":"structure",
+      "required":["autoSubscribe"],
+      "members":{
+        "autoSubscribe":{
+          "shape":"AutoSubscriptionStatus",
+          "documentation":"<p>Describes whether automatic subscriptions are enabled for an Amazon Q Business application using IAM identity federation for user management.</p>"
+        },
+        "defaultSubscriptionType":{
+          "shape":"SubscriptionType",
+          "documentation":"<p>Describes the default subscription type assigned to an Amazon Q Business application using IAM identity federation for user management. If the value for <code>autoSubscribe</code> is set to <code>ENABLED</code> you must select a value for this field.</p>"
+        }
+      },
+      "documentation":"<p>Subscription configuration information for an Amazon Q Business application using IAM identity federation for user management. </p>"
+    },
+    "AutoSubscriptionStatus":{
+      "type":"string",
+      "enum":[
+        "ENABLED",
+        "DISABLED"
+      ]
     },
     "BasicAuthConfiguration":{
       "type":"structure",
@@ -1834,7 +1871,7 @@
         },
         "userGroups":{
           "shape":"UserGroups",
-          "documentation":"<p>The groups that a user associated with the chat input belongs to.</p>",
+          "documentation":"<p>The group names that a user associated with the chat input belongs to.</p>",
           "location":"querystring",
           "locationName":"userGroups"
         },
@@ -1969,7 +2006,7 @@
         },
         "userGroups":{
           "shape":"UserGroups",
-          "documentation":"<p>The groups that a user associated with the chat input belongs to.</p>",
+          "documentation":"<p>The group names that a user associated with the chat input belongs to.</p>",
           "location":"querystring",
           "locationName":"userGroups"
         },
@@ -1995,7 +2032,7 @@
         },
         "parentMessageId":{
           "shape":"MessageId",
-          "documentation":"<p>The identifier of the previous end user text input message in a conversation.</p>"
+          "documentation":"<p>The identifier of the previous system message in a conversation.</p>"
         },
         "attributeFilter":{
           "shape":"AttributeFilter",
@@ -2052,6 +2089,15 @@
           "documentation":"<p>A list of files which failed to upload during chat.</p>"
         }
       }
+    },
+    "ClientIdForOIDC":{
+      "type":"string",
+      "max":255,
+      "min":1
+    },
+    "ClientIdsForOIDC":{
+      "type":"list",
+      "member":{"shape":"ClientIdForOIDC"}
     },
     "ClientToken":{
       "type":"string",
@@ -2175,11 +2221,23 @@
         },
         "roleArn":{
           "shape":"RoleArn",
-          "documentation":"<p> The Amazon Resource Name (ARN) of an IAM role with permissions to access your Amazon CloudWatch logs and metrics.</p>"
+          "documentation":"<p> The Amazon Resource Name (ARN) of an IAM role with permissions to access your Amazon CloudWatch logs and metrics. If this property is not specified, Amazon Q Business will create a <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/using-service-linked-roles.html#slr-permissions\">service linked role (SLR)</a> and use it as the application's role.</p>"
+        },
+        "identityType":{
+          "shape":"IdentityType",
+          "documentation":"<p>The authentication type being used by a Amazon Q Business application.</p>"
+        },
+        "iamIdentityProviderArn":{
+          "shape":"IamIdentityProviderArn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of an identity provider being used by an Amazon Q Business application.</p>"
         },
         "identityCenterInstanceArn":{
           "shape":"InstanceArn",
           "documentation":"<p> The Amazon Resource Name (ARN) of the IAM Identity Center instance you are either creating for—or connecting to—your Amazon Q Business application.</p>"
+        },
+        "clientIdsForOIDC":{
+          "shape":"ClientIdsForOIDC",
+          "documentation":"<p>The OIDC client ID for a Amazon Q Business application.</p>"
         },
         "description":{
           "shape":"Description",
@@ -2201,6 +2259,14 @@
         "attachmentsConfiguration":{
           "shape":"AttachmentsConfiguration",
           "documentation":"<p>An option to allow end users to upload files directly during chat.</p>"
+        },
+        "qAppsConfiguration":{
+          "shape":"QAppsConfiguration",
+          "documentation":"<p>An option to allow end users to create and use Amazon Q Apps in the web experience.</p>"
+        },
+        "personalizationConfiguration":{
+          "shape":"PersonalizationConfiguration",
+          "documentation":"<p>Configuration information about chat response personalization. For more information, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/personalizing-chat-responses.html\">Personalizing chat responses</a> </p>"
         }
       }
     },
@@ -2244,7 +2310,7 @@
         },
         "configuration":{
           "shape":"DataSourceConfiguration",
-          "documentation":"<p>Configuration information to connect to your data source repository. For configuration templates for your specific data source, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/connectors-list.html\">Supported connectors</a>.</p>"
+          "documentation":"<p>Configuration information to connect your data source repository to Amazon Q Business. Use this parameter to provide a JSON schema with configuration information specific to your data source connector.</p> <p>Each data source has a JSON schema provided by Amazon Q Business that you must use. For example, the Amazon S3 and Web Crawler connectors require the following JSON schemas:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/s3-api.html\">Amazon S3 JSON schema</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/web-crawler-api.html\">Web Crawler JSON schema</a> </p> </li> </ul> <p>You can find configuration templates for your specific data source using the following steps:</p> <ol> <li> <p>Navigate to the <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/connectors-list.html\">Supported connectors</a> page in the Amazon Q Business User Guide, and select the data source of your choice.</p> </li> <li> <p>Then, from your specific data source connector page, select <b>Using the API</b>. You will find the JSON schema for your data source, including parameter descriptions, in this section.</p> </li> </ol>"
         },
         "vpcConfiguration":{
           "shape":"DataSourceVpcConfiguration",
@@ -2306,7 +2372,7 @@
         },
         "type":{
           "shape":"IndexType",
-          "documentation":"<p>The index type that's suitable for your needs. For more information on what's included in each type of index or index tier, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/what-is.html#tiers\">Amazon Q Business tiers</a>.</p>"
+          "documentation":"<p>The index type that's suitable for your needs. For more information on what's included in each type of index, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/tiers.html#index-tiers\">Amazon Q Business tiers</a>.</p>"
         },
         "description":{
           "shape":"Description",
@@ -2517,9 +2583,13 @@
           "shape":"WebExperienceSamplePromptsControlMode",
           "documentation":"<p>Determines whether sample prompts are enabled in the web experience for an end user.</p>"
         },
+        "origins":{
+          "shape":"WebExperienceOrigins",
+          "documentation":"<p>Sets the website domain origins that are allowed to embed the Amazon Q Business web experience. <pre><code> The &lt;i&gt;domain origin&lt;/i&gt; refers to the base URL for accessing a website including the protocol (&lt;code&gt;http/https&lt;/code&gt;), the domain name, and the port number (if specified). &lt;/p&gt; &lt;note&gt; &lt;p&gt;You must only submit a &lt;i&gt;base URL&lt;/i&gt; and not a full path. For example, &lt;code&gt;https://docs.aws.amazon.com&lt;/code&gt;.&lt;/p&gt; &lt;/note&gt; </code></pre>"
+        },
         "roleArn":{
           "shape":"RoleArn",
-          "documentation":"<p>The Amazon Resource Name (ARN) of the service role attached to your web experience.</p>"
+          "documentation":"<p>The Amazon Resource Name (ARN) of the service role attached to your web experience.</p> <note> <p>You must provide this value if you're using IAM Identity Center to manage end user access to your application. If you're using legacy identity management to manage user access, you don't need to provide this value.</p> </note>"
         },
         "tags":{
           "shape":"Tags",
@@ -2529,6 +2599,10 @@
           "shape":"ClientToken",
           "documentation":"<p>A token you provide to identify a request to create an Amazon Q Business web experience. </p>",
           "idempotencyToken":true
+        },
+        "identityProviderConfiguration":{
+          "shape":"IdentityProviderConfiguration",
+          "documentation":"<p>Information about the identity provider (IdP) used to authenticate end users of an Amazon Q Business web experience.</p>"
         }
       }
     },
@@ -3522,6 +3596,14 @@
           "shape":"ApplicationArn",
           "documentation":"<p>The Amazon Resource Name (ARN) of the Amazon Q Business application.</p>"
         },
+        "identityType":{
+          "shape":"IdentityType",
+          "documentation":"<p>The authentication type being used by a Amazon Q Business application.</p>"
+        },
+        "iamIdentityProviderArn":{
+          "shape":"IamIdentityProviderArn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of an identity provider being used by an Amazon Q Business application.</p>"
+        },
         "identityCenterApplicationArn":{
           "shape":"IdcApplicationArn",
           "documentation":"<p>The Amazon Resource Name (ARN) of the AWS IAM Identity Center instance attached to your Amazon Q Business application.</p>"
@@ -3557,6 +3639,22 @@
         "attachmentsConfiguration":{
           "shape":"AppliedAttachmentsConfiguration",
           "documentation":"<p>Settings for whether end users can upload files directly during chat.</p>"
+        },
+        "qAppsConfiguration":{
+          "shape":"QAppsConfiguration",
+          "documentation":"<p>Settings for whether end users can create and use Amazon Q Apps in the web experience.</p>"
+        },
+        "personalizationConfiguration":{
+          "shape":"PersonalizationConfiguration",
+          "documentation":"<p>Configuration information about chat response personalization. For more information, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/personalizing-chat-responses.html\">Personalizing chat responses</a>.</p>"
+        },
+        "autoSubscriptionConfiguration":{
+          "shape":"AutoSubscriptionConfiguration",
+          "documentation":"<p>Settings for auto-subscription behavior for this application. This is only applicable to SAML and OIDC applications.</p>"
+        },
+        "clientIdsForOIDC":{
+          "shape":"ClientIdsForOIDC",
+          "documentation":"<p>The OIDC client ID for a Amazon Q Business application.</p>"
         }
       }
     },
@@ -4060,9 +4158,17 @@
           "shape":"WebExperienceSamplePromptsControlMode",
           "documentation":"<p>Determines whether sample prompts are enabled in the web experience for an end user.</p>"
         },
+        "origins":{
+          "shape":"WebExperienceOrigins",
+          "documentation":"<p>Gets the website domain origins that are allowed to embed the Amazon Q Business web experience. <pre><code> The &lt;i&gt;domain origin&lt;/i&gt; refers to the base URL for accessing a website including the protocol (&lt;code&gt;http/https&lt;/code&gt;), the domain name, and the port number (if specified). &lt;/p&gt; </code></pre>"
+        },
         "roleArn":{
           "shape":"RoleArn",
           "documentation":"<p> The Amazon Resource Name (ARN) of the service role attached to your web experience.</p>"
+        },
+        "identityProviderConfiguration":{
+          "shape":"IdentityProviderConfiguration",
+          "documentation":"<p>Information about the identity provider (IdP) used to authenticate end users of an Amazon Q Business web experience.</p>"
         },
         "authenticationConfiguration":{
           "shape":"WebExperienceAuthConfiguration",
@@ -4164,11 +4270,34 @@
       },
       "documentation":"<p>Provides the configuration information for invoking a Lambda function in Lambda to alter document metadata and content when ingesting documents into Amazon Q Business.</p> <p>You can configure your Lambda function using the <code>PreExtractionHookConfiguration</code> parameter if you want to apply advanced alterations on the original or raw documents.</p> <p>If you want to apply advanced alterations on the Amazon Q Business structured documents, you must configure your Lambda function using <code>PostExtractionHookConfiguration</code>.</p> <p>You can only invoke one Lambda function. However, this function can invoke other functions it requires.</p> <p>For more information, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/custom-document-enrichment.html\">Custom document enrichment</a>. </p>"
     },
+    "IamIdentityProviderArn":{
+      "type":"string",
+      "max":2048,
+      "min":20,
+      "pattern":"arn:aws:iam::\\d{12}:(oidc-provider|saml-provider)/[a-zA-Z0-9_\\.\\/@\\-]+"
+    },
     "IdcApplicationArn":{
       "type":"string",
       "max":1224,
       "min":10,
       "pattern":"arn:(aws|aws-us-gov|aws-cn|aws-iso|aws-iso-b):sso::\\d{12}:application/(sso)?ins-[a-zA-Z0-9-.]{16}/apl-[a-zA-Z0-9]{16}"
+    },
+    "IdentityProviderConfiguration":{
+      "type":"structure",
+      "members":{
+        "samlConfiguration":{"shape":"SamlProviderConfiguration"},
+        "openIDConnectConfiguration":{"shape":"OpenIDConnectProviderConfiguration"}
+      },
+      "documentation":"<p>Provides information about the identity provider (IdP) used to authenticate end users of an Amazon Q Business web experience.</p>",
+      "union":true
+    },
+    "IdentityType":{
+      "type":"string",
+      "enum":[
+        "AWS_IAM_IDP_SAML",
+        "AWS_IAM_IDP_OIDC",
+        "AWS_IAM_IDC"
+      ]
     },
     "Index":{
       "type":"structure",
@@ -5213,9 +5342,51 @@
       },
       "documentation":"<p>Information about the OAuth 2.0 authentication credential/token used to configure a plugin.</p>"
     },
+    "OpenIDConnectProviderConfiguration":{
+      "type":"structure",
+      "required":[
+        "secretsArn",
+        "secretsRole"
+      ],
+      "members":{
+        "secretsArn":{
+          "shape":"SecretArn",
+          "documentation":"<p>The Amazon Resource Name (ARN) of a Secrets Manager secret containing the OIDC client secret.</p>"
+        },
+        "secretsRole":{
+          "shape":"RoleArn",
+          "documentation":"<p>An IAM role with permissions to access KMS to decrypt the Secrets Manager secret containing your OIDC client secret.</p>"
+        }
+      },
+      "documentation":"<p>Information about the OIDC-compliant identity provider (IdP) used to authenticate end users of an Amazon Q Business web experience.</p>"
+    },
+    "Origin":{
+      "type":"string",
+      "max":256,
+      "min":1,
+      "pattern":"(http://|https://)[a-zA-Z0-9-_.]+(?::[0-9]{1,5})?"
+    },
     "Payload":{
       "type":"string",
       "sensitive":true
+    },
+    "PersonalizationConfiguration":{
+      "type":"structure",
+      "required":["personalizationControlMode"],
+      "members":{
+        "personalizationControlMode":{
+          "shape":"PersonalizationControlMode",
+          "documentation":"<p>An option to allow Amazon Q Business to customize chat responses using user specific metadata—specifically, location and job information—in your IAM Identity Center instance.</p>"
+        }
+      },
+      "documentation":"<p>Configuration information about chat response personalization. For more information, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/personalizing-chat-responses.html\">Personalizing chat responses</a>.</p>"
+    },
+    "PersonalizationControlMode":{
+      "type":"string",
+      "enum":[
+        "ENABLED",
+        "DISABLED"
+      ]
     },
     "Plugin":{
       "type":"structure",
@@ -5464,7 +5635,7 @@
         },
         "groupName":{
           "shape":"GroupName",
-          "documentation":"<p>The list that contains your users or sub groups that belong the same group. For example, the group \"Company\" includes the user \"CEO\" and the sub groups \"Research\", \"Engineering\", and \"Sales and Marketing\".</p> <p>If you have more than 1000 users and/or sub groups for a single group, you need to provide the path to the S3 file that lists your users and sub groups for a group. Your sub groups can contain more than 1000 users, but the list of sub groups that belong to a group (and/or users) must be no more than 1000.</p>"
+          "documentation":"<p>The list that contains your users or sub groups that belong the same group. For example, the group \"Company\" includes the user \"CEO\" and the sub groups \"Research\", \"Engineering\", and \"Sales and Marketing\".</p>"
         },
         "dataSourceId":{
           "shape":"DataSourceId",
@@ -5481,6 +5652,24 @@
       "type":"structure",
       "members":{
       }
+    },
+    "QAppsConfiguration":{
+      "type":"structure",
+      "required":["qAppsControlMode"],
+      "members":{
+        "qAppsControlMode":{
+          "shape":"QAppsControlMode",
+          "documentation":"<p>Status information about whether end users can create and use Amazon Q Apps in the web experience.</p>"
+        }
+      },
+      "documentation":"<p>Configuration information about Amazon Q Apps.</p>"
+    },
+    "QAppsControlMode":{
+      "type":"string",
+      "enum":[
+        "ENABLED",
+        "DISABLED"
+      ]
     },
     "ReadAccessType":{
       "type":"string",
@@ -5690,6 +5879,12 @@
       "max":256,
       "min":1
     },
+    "SamlAuthenticationUrl":{
+      "type":"string",
+      "max":1284,
+      "min":1,
+      "pattern":"https://.*"
+    },
     "SamlConfiguration":{
       "type":"structure",
       "required":[
@@ -5722,6 +5917,17 @@
       "max":10000000,
       "min":1000,
       "pattern":".*"
+    },
+    "SamlProviderConfiguration":{
+      "type":"structure",
+      "required":["authenticationUrl"],
+      "members":{
+        "authenticationUrl":{
+          "shape":"SamlAuthenticationUrl",
+          "documentation":"<p>The URL where Amazon Q Business end users will be redirected for authentication. </p>"
+        }
+      },
+      "documentation":"<p>Information about the SAML 2.0-compliant identity provider (IdP) used to authenticate end users of an Amazon Q Business web experience.</p>"
     },
     "SecretArn":{
       "type":"string",
@@ -5947,6 +6153,13 @@
     "SubnetIds":{
       "type":"list",
       "member":{"shape":"SubnetId"}
+    },
+    "SubscriptionType":{
+      "type":"string",
+      "enum":[
+        "Q_LITE",
+        "Q_BUSINESS"
+      ]
     },
     "SyncSchedule":{
       "type":"string",
@@ -6219,6 +6432,18 @@
         "attachmentsConfiguration":{
           "shape":"AttachmentsConfiguration",
           "documentation":"<p>An option to allow end users to upload files directly during chat.</p>"
+        },
+        "qAppsConfiguration":{
+          "shape":"QAppsConfiguration",
+          "documentation":"<p>An option to allow end users to create and use Amazon Q Apps in the web experience.</p>"
+        },
+        "personalizationConfiguration":{
+          "shape":"PersonalizationConfiguration",
+          "documentation":"<p>Configuration information about chat response personalization. For more information, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/personalizing-chat-responses.html\">Personalizing chat responses</a>.</p>"
+        },
+        "autoSubscriptionConfiguration":{
+          "shape":"AutoSubscriptionConfiguration",
+          "documentation":"<p>An option to enable updating the default subscription type assigned to an Amazon Q Business application using IAM identity federation for user management.</p>"
         }
       }
     },
@@ -6534,6 +6759,14 @@
         "samplePromptsControlMode":{
           "shape":"WebExperienceSamplePromptsControlMode",
           "documentation":"<p>Determines whether sample prompts are enabled in the web experience for an end user.</p>"
+        },
+        "identityProviderConfiguration":{
+          "shape":"IdentityProviderConfiguration",
+          "documentation":"<p>Information about the identity provider (IdP) used to authenticate end users of an Amazon Q Business web experience.</p>"
+        },
+        "origins":{
+          "shape":"WebExperienceOrigins",
+          "documentation":"<p>Updates the website domain origins that are allowed to embed the Amazon Q Business web experience. <pre><code> The &lt;i&gt;domain origin&lt;/i&gt; refers to the &lt;i&gt;base URL&lt;/i&gt; for accessing a website including the protocol (&lt;code&gt;http/https&lt;/code&gt;), the domain name, and the port number (if specified).&lt;/p&gt; &lt;note&gt; &lt;ul&gt; &lt;li&gt; &lt;p&gt;Any values except &lt;code&gt;null&lt;/code&gt; submitted as part of this update will replace all previous values.&lt;/p&gt; &lt;/li&gt; &lt;li&gt; &lt;p&gt;You must only submit a &lt;i&gt;base URL&lt;/i&gt; and not a full path. For example, &lt;code&gt;https://docs.aws.amazon.com&lt;/code&gt;.&lt;/p&gt; &lt;/li&gt; &lt;/ul&gt; &lt;/note&gt; </code></pre>"
         }
       }
     },
@@ -6599,10 +6832,10 @@
         },
         "userGroups":{
           "shape":"UserGroups",
-          "documentation":"<p>The user groups associated with a topic control rule.</p>"
+          "documentation":"<p>The user group names associated with a topic control rule.</p>"
         }
       },
-      "documentation":"<p>Provides information about users and groups associated with a topic control rule.</p>"
+      "documentation":"<p>Provides information about users and group names associated with a topic control rule.</p>"
     },
     "ValidationException":{
       "type":"structure",
@@ -6707,6 +6940,12 @@
       "min":36,
       "pattern":"[a-zA-Z0-9][a-zA-Z0-9-]*"
     },
+    "WebExperienceOrigins":{
+      "type":"list",
+      "member":{"shape":"Origin"},
+      "max":10,
+      "min":0
+    },
     "WebExperienceSamplePromptsControlMode":{
       "type":"string",
       "enum":[
@@ -6746,5 +6985,5 @@
       "member":{"shape":"WebExperience"}
     }
   },
-  "documentation":"<p>This is the <i>Amazon Q Business</i> API Reference. Amazon Q Business is a fully managed, generative-AI powered enterprise chat assistant that you can deploy within your organization. Amazon Q Business enhances employee productivity by supporting key tasks such as question-answering, knowledge discovery, writing email messages, summarizing text, drafting document outlines, and brainstorming ideas. Users ask questions of Amazon Q Business and get answers that are presented in a conversational manner. For an introduction to the service, see the <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/what-is.html\"> <i>Amazon Q Business User Guide</i> </a>.</p> <p>For an overview of the Amazon Q Business APIs, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/api-ref.html#api-overview\">Overview of Amazon Q Business API operations</a>.</p> <p>For information about the IAM access control permissions you need to use this API, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/iam-roles.html\">IAM roles for Amazon Q Business</a> in the <i>Amazon Q Business User Guide</i>.</p> <p>You can use the following AWS SDKs to access Amazon Q Business APIs:</p> <ul> <li> <p> <a href=\"https://docs.aws.amazon.com/sdk-for-cpp\">AWS SDK for C++</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/sdk-for-go\">AWS SDK for Go</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/sdk-for-java\">AWS SDK for Java</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/sdk-for-javascript\">AWS SDK for JavaScript</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/sdk-for-net\">AWS SDK for .NET</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/pythonsdk\">AWS SDK for Python (Boto3)</a> </p> </li> <li> <p> <a href=\"https://docs.aws.amazon.com/sdk-for-ruby\">AWS SDK for Ruby</a> </p> </li> </ul> <p>The following resources provide additional information about using the Amazon Q Business API:</p> <ul> <li> <p> <i> <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/setting-up.html\">Setting up for Amazon Q Business</a> </i> </p> </li> <li> <p> <i> <a href=\"https://awscli.amazonaws.com/v2/documentation/api/latest/reference/qbusiness/index.html\">Amazon Q Business CLI Reference</a> </i> </p> </li> <li> <p> <i> <a href=\"https://docs.aws.amazon.com/general/latest/gr/amazonq.html\">Amazon Web Services General Reference</a> </i> </p> </li> </ul>"
+  "documentation":"<p>This is the <i>Amazon Q Business</i> API Reference. Amazon Q Business is a fully managed, generative-AI powered enterprise chat assistant that you can deploy within your organization. Amazon Q Business enhances employee productivity by supporting key tasks such as question-answering, knowledge discovery, writing email messages, summarizing text, drafting document outlines, and brainstorming ideas. Users ask questions of Amazon Q Business and get answers that are presented in a conversational manner. For an introduction to the service, see the <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/what-is.html\"> <i>Amazon Q Business User Guide</i> </a>.</p> <p>For an overview of the Amazon Q Business APIs, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/api-ref.html#api-overview\">Overview of Amazon Q Business API operations</a>.</p> <p>For information about the IAM access control permissions you need to use this API, see <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/iam-roles.html\">IAM roles for Amazon Q Business</a> in the <i>Amazon Q Business User Guide</i>.</p> <p>The following resources provide additional information about using the Amazon Q Business API:</p> <ul> <li> <p> <i> <a href=\"https://docs.aws.amazon.com/amazonq/latest/business-use-dg/setting-up.html\">Setting up for Amazon Q Business</a> </i> </p> </li> <li> <p> <i> <a href=\"https://awscli.amazonaws.com/v2/documentation/api/latest/reference/qbusiness/index.html\">Amazon Q Business CLI Reference</a> </i> </p> </li> <li> <p> <i> <a href=\"https://docs.aws.amazon.com/general/latest/gr/amazonq.html\">Amazon Web Services General Reference</a> </i> </p> </li> </ul>"
 }

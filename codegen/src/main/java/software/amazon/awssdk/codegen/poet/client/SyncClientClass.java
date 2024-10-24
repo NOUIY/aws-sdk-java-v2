@@ -137,10 +137,8 @@ public class SyncClientClass extends SyncClientInterface {
 
     @Override
     protected void addAdditionalMethods(TypeSpec.Builder type) {
-        if (!useSraAuth) {
-            if (model.containsRequestSigners()) {
-                type.addMethod(applySignerOverrideMethod(poetExtensions, model));
-            }
+        if (!useSraAuth && model.containsRequestSigners()) {
+            type.addMethod(applySignerOverrideMethod(poetExtensions, model));
         }
 
         model.getEndpointOperation().ifPresent(
@@ -152,6 +150,7 @@ public class SyncClientClass extends SyncClientInterface {
             .addMethod(resolveMetricPublishersMethod());
 
         protocolSpec.createErrorResponseHandler().ifPresent(type::addMethod);
+        type.addMethod(ClientClassUtils.updateRetryStrategyClientConfigurationMethod());
         type.addMethod(updateSdkClientConfigurationMethod(configurationUtils.serviceClientConfigurationBuilderClassName()));
         type.addMethod(protocolSpec.initProtocolFactory(model));
     }
@@ -220,8 +219,8 @@ public class SyncClientClass extends SyncClientInterface {
                                                                "EndpointDiscoveryCacheLoader"));
 
             if (model.getCustomizationConfig().allowEndpointOverrideForEndpointDiscoveryRequiredOperations()) {
-                builder.beginControlFlow("if (clientConfiguration.option(SdkClientOption.ENDPOINT_OVERRIDDEN) == "
-                                         + "Boolean.TRUE)");
+                builder.beginControlFlow("if (clientConfiguration.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER)"
+                                         + ".isEndpointOverridden())");
                 builder.addStatement("log.warn(() -> $S)",
                                      "Endpoint discovery is enabled for this client, and an endpoint override was also "
                                      + "specified. This will disable endpoint discovery for methods that require it, instead "
@@ -266,7 +265,8 @@ public class SyncClientClass extends SyncClientInterface {
             method.addStatement("boolean endpointDiscoveryEnabled = "
                                 + "clientConfiguration.option(SdkClientOption.ENDPOINT_DISCOVERY_ENABLED)");
             method.addStatement("boolean endpointOverridden = "
-                                + "clientConfiguration.option(SdkClientOption.ENDPOINT_OVERRIDDEN) == Boolean.TRUE");
+                                + "clientConfiguration.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER)"
+                                + ".isEndpointOverridden()");
 
             if (opModel.getEndpointDiscovery().isRequired()) {
                 if (!model.getCustomizationConfig().allowEndpointOverrideForEndpointDiscoveryRequiredOperations()) {
@@ -310,7 +310,8 @@ public class SyncClientClass extends SyncClientInterface {
 
             method.addCode("$1T endpointDiscoveryRequest = $1T.builder()", EndpointDiscoveryRequest.class)
                   .addCode("    .required($L)", opModel.getInputShape().getEndpointDiscovery().isRequired())
-                  .addCode("    .defaultEndpoint(clientConfiguration.option($T.ENDPOINT))", SdkClientOption.class)
+                  .addCode("    .defaultEndpoint(clientConfiguration.option($T.CLIENT_ENDPOINT_PROVIDER).clientEndpoint())",
+                           SdkClientOption.class)
                   .addCode("    .overrideConfiguration($N.overrideConfiguration().orElse(null))",
                            opModel.getInput().getVariableName())
                   .addCode("    .build();");
@@ -406,6 +407,7 @@ public class SyncClientClass extends SyncClientInterface {
             case AWS_JSON:
             case REST_JSON:
             case CBOR:
+            case SMITHY_RPC_V2_CBOR:
                 return new JsonProtocolSpec(poetExtensions, model);
             default:
                 throw new RuntimeException("Unknown protocol: " + protocol.name());
@@ -478,6 +480,7 @@ public class SyncClientClass extends SyncClientInterface {
 
         if (model.getCustomizationConfig() == null ||
             CollectionUtils.isNullOrEmpty(model.getCustomizationConfig().getCustomClientContextParams())) {
+            builder.addStatement("updateRetryStrategyClientConfiguration(configuration)");
             builder.addStatement("return configuration.build()");
             return builder.build();
         }
@@ -499,7 +502,7 @@ public class SyncClientClass extends SyncClientInterface {
                                  Validate.class, Objects.class, endpointRulesSpecUtils.clientContextParamsName(), keyName,
                                  keyName + " cannot be modified by request level plugins");
         });
-
+        builder.addStatement("updateRetryStrategyClientConfiguration(configuration)");
         builder.addStatement("return configuration.build()");
         return builder.build();
     }

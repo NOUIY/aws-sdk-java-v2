@@ -10,7 +10,8 @@
     "serviceFullName":"AWS Batch",
     "serviceId":"Batch",
     "signatureVersion":"v4",
-    "uid":"batch-2016-08-10"
+    "uid":"batch-2016-08-10",
+    "auth":["aws.auth#sigv4"]
   },
   "operations":{
     "CancelJob":{
@@ -25,7 +26,7 @@
         {"shape":"ClientException"},
         {"shape":"ServerException"}
       ],
-      "documentation":"<p>Cancels a job in an Batch job queue. Jobs that are in the <code>SUBMITTED</code> or <code>PENDING</code> are canceled. A job in<code>RUNNABLE</code> remains in <code>RUNNABLE</code> until it reaches the head of the job queue. Then the job status is updated to <code>FAILED</code>.</p> <note> <p>A <code>PENDING</code> job is canceled after all dependency jobs are completed. Therefore, it may take longer than expected to cancel a job in <code>PENDING</code> status.</p> <p>When you try to cancel an array parent job in <code>PENDING</code>, Batch attempts to cancel all child jobs. The array parent job is canceled when all child jobs are completed.</p> </note> <p>Jobs that progressed to the <code>STARTING</code> or <code>RUNNING</code> state aren't canceled. However, the API operation still succeeds, even if no job is canceled. These jobs must be terminated with the <a>TerminateJob</a> operation.</p>"
+      "documentation":"<p>Cancels a job in an Batch job queue. Jobs that are in a <code>SUBMITTED</code>, <code>PENDING</code>, or <code>RUNNABLE</code> state are cancelled and the job status is updated to <code>FAILED</code>.</p> <note> <p>A <code>PENDING</code> job is canceled after all dependency jobs are completed. Therefore, it may take longer than expected to cancel a job in <code>PENDING</code> status.</p> <p>When you try to cancel an array parent job in <code>PENDING</code>, Batch attempts to cancel all child jobs. The array parent job is canceled when all child jobs are completed.</p> </note> <p>Jobs that progressed to the <code>STARTING</code> or <code>RUNNING</code> state aren't canceled. However, the API operation still succeeds, even if no job is canceled. These jobs must be terminated with the <a>TerminateJob</a> operation.</p>"
     },
     "CreateComputeEnvironment":{
       "name":"CreateComputeEnvironment",
@@ -680,6 +681,10 @@
         "uuid":{
           "shape":"String",
           "documentation":"<p>Unique identifier for the compute environment.</p>"
+        },
+        "context":{
+          "shape":"String",
+          "documentation":"<p>Reserved.</p>"
         }
       },
       "documentation":"<p>An object that represents an Batch compute environment.</p>"
@@ -1175,6 +1180,10 @@
         "eksConfiguration":{
           "shape":"EksConfiguration",
           "documentation":"<p>The details for the Amazon EKS cluster that supports the compute environment.</p>"
+        },
+        "context":{
+          "shape":"String",
+          "documentation":"<p>Reserved.</p>"
         }
       },
       "documentation":"<p>Contains the parameters for <code>CreateComputeEnvironment</code>.</p>"
@@ -1765,6 +1774,10 @@
         "initContainers":{
           "shape":"EksAttemptContainerDetails",
           "documentation":"<p>The details for the init containers.</p>"
+        },
+        "eksClusterArn":{
+          "shape":"String",
+          "documentation":"<p>The Amazon Resource Name (ARN) of the Amazon EKS cluster.</p>"
         },
         "podName":{
           "shape":"String",
@@ -3260,6 +3273,10 @@
         "instanceTypes":{
           "shape":"StringList",
           "documentation":"<p>An object that contains the instance types that you want to replace for the existing resources of a job.</p>"
+        },
+        "eksPropertiesOverride":{
+          "shape":"EksPropertiesOverride",
+          "documentation":"<p>An object that contains the properties that you want to replace for the existing Amazon EKS resources of a job.</p>"
         }
       },
       "documentation":"<p>The object that represents any node overrides to a job definition that's used in a <a href=\"https://docs.aws.amazon.com/batch/latest/APIReference/API_SubmitJob.html\">SubmitJob</a> API operation.</p>"
@@ -3290,6 +3307,10 @@
         },
         "ecsProperties":{
           "shape":"EcsProperties",
+          "documentation":"<p>This is an object that represents the properties of the node range for a multi-node parallel job.</p>"
+        },
+        "eksProperties":{
+          "shape":"EksProperties",
           "documentation":"<p>This is an object that represents the properties of the node range for a multi-node parallel job.</p>"
         }
       },
@@ -4069,6 +4090,10 @@
         "updatePolicy":{
           "shape":"UpdatePolicy",
           "documentation":"<p>Specifies the updated infrastructure update policy for the compute environment. For more information about infrastructure updates, see <a href=\"https://docs.aws.amazon.com/batch/latest/userguide/updating-compute-environments.html\">Updating compute environments</a> in the <i>Batch User Guide</i>.</p>"
+        },
+        "context":{
+          "shape":"String",
+          "documentation":"<p>Reserved.</p>"
         }
       },
       "documentation":"<p>Contains the parameters for <code>UpdateComputeEnvironment</code>.</p>"

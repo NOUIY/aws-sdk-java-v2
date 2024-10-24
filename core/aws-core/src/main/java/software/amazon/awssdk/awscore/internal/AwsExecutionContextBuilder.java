@@ -80,7 +80,7 @@ public final class AwsExecutionContextBuilder {
 
         executionAttributes
             .putAttribute(InternalCoreExecutionAttribute.EXECUTION_ATTEMPT, 1)
-            .putAttribute(AwsSignerExecutionAttribute.SERVICE_CONFIG,
+            .putAttribute(SdkExecutionAttribute.SERVICE_CONFIG,
                           clientConfig.option(SdkClientOption.SERVICE_CONFIGURATION))
             .putAttribute(AwsSignerExecutionAttribute.SERVICE_SIGNING_NAME,
                           clientConfig.option(AwsClientOption.SERVICE_SIGNING_NAME))
@@ -102,8 +102,8 @@ public final class AwsExecutionContextBuilder {
             .putAttribute(AwsExecutionAttribute.FIPS_ENDPOINT_ENABLED,
                           clientConfig.option(AwsClientOption.FIPS_ENDPOINT_ENABLED))
             .putAttribute(SdkExecutionAttribute.OPERATION_NAME, executionParams.getOperationName())
-            .putAttribute(SdkExecutionAttribute.CLIENT_ENDPOINT, clientConfig.option(SdkClientOption.ENDPOINT))
-            .putAttribute(SdkExecutionAttribute.ENDPOINT_OVERRIDDEN, clientConfig.option(SdkClientOption.ENDPOINT_OVERRIDDEN))
+            .putAttribute(SdkInternalExecutionAttribute.CLIENT_ENDPOINT_PROVIDER,
+                          clientConfig.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER))
             .putAttribute(SdkInternalExecutionAttribute.ENDPOINT_PROVIDER,
                           resolveEndpointProvider(originalRequest, clientConfig))
             .putAttribute(SdkInternalExecutionAttribute.CLIENT_CONTEXT_PARAMS,
@@ -131,10 +131,11 @@ public final class AwsExecutionContextBuilder {
                                                      .build();
         interceptorContext = runInitialInterceptors(interceptorContext, executionAttributes, executionInterceptorChain);
 
+        SdkRequest modifiedRequests = interceptorContext.request();
         Signer signer = null;
-        if (loadOldSigner(executionAttributes, originalRequest)) {
+        if (loadOldSigner(executionAttributes, modifiedRequests)) {
             AuthorizationStrategyFactory authorizationStrategyFactory =
-                new AuthorizationStrategyFactory(interceptorContext.request(), metricCollector, clientConfig);
+                new AuthorizationStrategyFactory(modifiedRequests, metricCollector, clientConfig);
             AuthorizationStrategy authorizationStrategy =
                 authorizationStrategyFactory.strategyFor(executionParams.credentialType());
             authorizationStrategy.addCredentialsToExecutionAttributes(executionAttributes);

@@ -43,6 +43,7 @@ import software.amazon.awssdk.auth.token.credentials.aws.DefaultAwsTokenProvider
 import software.amazon.awssdk.auth.token.signer.aws.BearerTokenSigner;
 import software.amazon.awssdk.awscore.client.builder.AwsDefaultClientBuilder;
 import software.amazon.awssdk.awscore.client.config.AwsClientOption;
+import software.amazon.awssdk.awscore.endpoint.AwsClientEndpointProvider;
 import software.amazon.awssdk.codegen.internal.Utils;
 import software.amazon.awssdk.codegen.model.intermediate.IntermediateModel;
 import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
@@ -52,6 +53,7 @@ import software.amazon.awssdk.codegen.poet.ClassSpec;
 import software.amazon.awssdk.codegen.poet.PoetUtils;
 import software.amazon.awssdk.codegen.poet.auth.scheme.AuthSchemeSpecUtils;
 import software.amazon.awssdk.codegen.poet.auth.scheme.ModelAuthSchemeClassesKnowledgeIndex;
+import software.amazon.awssdk.codegen.poet.client.ClientClassUtils;
 import software.amazon.awssdk.codegen.poet.model.ServiceClientConfigurationUtils;
 import software.amazon.awssdk.codegen.poet.rules.EndpointParamsKnowledgeIndex;
 import software.amazon.awssdk.codegen.poet.rules.EndpointRulesSpecUtils;
@@ -71,6 +73,7 @@ import software.amazon.awssdk.http.auth.spi.scheme.AuthScheme;
 import software.amazon.awssdk.identity.spi.IdentityProvider;
 import software.amazon.awssdk.identity.spi.IdentityProviders;
 import software.amazon.awssdk.identity.spi.TokenIdentity;
+import software.amazon.awssdk.regions.ServiceMetadataAdvancedOption;
 import software.amazon.awssdk.utils.AttributeMap;
 import software.amazon.awssdk.utils.CollectionUtils;
 import software.amazon.awssdk.utils.StringUtils;
@@ -180,6 +183,7 @@ public class BaseClientBuilderClass implements ClassSpec {
         }
         addServiceHttpConfigIfNeeded(builder, model);
         builder.addMethod(invokePluginsMethod());
+        builder.addMethod(ClientClassUtils.updateRetryStrategyClientConfigurationMethod());
         builder.addMethod(internalPluginsMethod());
 
         endpointParamsKnowledgeIndex.resolveAccountIdEndpointModeMethod().ifPresent(builder::addMethod);
@@ -401,48 +405,80 @@ public class BaseClientBuilderClass implements ClassSpec {
         builder.addStatement("return result.build()")
                .addCode("});");
 
-        builder.addCode("builder.option($1T.EXECUTION_INTERCEPTORS, interceptors)", SdkClientOption.class);
+        builder.addStatement("builder.option($1T.EXECUTION_INTERCEPTORS, interceptors)", SdkClientOption.class);
 
         if (model.getCustomizationConfig().getServiceConfig().hasDualstackProperty()) {
-            builder.addCode(".option($T.DUALSTACK_ENDPOINT_ENABLED, finalServiceConfig.dualstackEnabled())",
+            // NOTE: usage of serviceConfigBuilder and not finalServiceConfig is intentional. We need the nullable boolean here
+            // to ensure fallback resolution of the dualstack configuration if dualstack was not explicitly configured on
+            // serviceConfigBuilder; the service configuration classes (e.g. S3Configuration) return primitive booleans that
+            // have a default when not present.
+            builder.addStatement("builder.option($T.DUALSTACK_ENDPOINT_ENABLED, serviceConfigBuilder.dualstackEnabled())",
                             AwsClientOption.class);
         }
 
         if (model.getCustomizationConfig().getServiceConfig().hasFipsProperty()) {
-            builder.addCode(".option($T.FIPS_ENDPOINT_ENABLED, finalServiceConfig.fipsModeEnabled())", AwsClientOption.class);
+            builder.addStatement("builder.option($T.FIPS_ENDPOINT_ENABLED, finalServiceConfig.fipsModeEnabled())",
+                                 AwsClientOption.class);
         }
 
         if (model.getEndpointOperation().isPresent()) {
-            builder.addCode(".option($T.ENDPOINT_DISCOVERY_ENABLED, endpointDiscoveryEnabled)\n",
+            builder.addStatement("builder.option($T.ENDPOINT_DISCOVERY_ENABLED, endpointDiscoveryEnabled)\n",
                             SdkClientOption.class);
         }
 
 
-        if (StringUtils.isNotBlank(model.getCustomizationConfig().getCustomRetryPolicy())) {
-            builder.addCode(".option($1T.RETRY_POLICY, $2T.resolveRetryPolicy(config))",
+        if (StringUtils.isNotBlank(model.getCustomizationConfig().getCustomRetryStrategy())) {
+            builder.addStatement("builder.option($1T.RETRY_STRATEGY, $2T.resolveRetryStrategy(config))",
                             SdkClientOption.class,
-                            PoetUtils.classNameFromFqcn(model.getCustomizationConfig().getCustomRetryPolicy()));
+                            PoetUtils.classNameFromFqcn(model.getCustomizationConfig().getCustomRetryStrategy()));
+        }
+
+        if (StringUtils.isNotBlank(model.getCustomizationConfig().getCustomRetryPolicy())) {
+            builder.beginControlFlow("if (builder.option($T.RETRY_STRATEGY) == null)", SdkClientOption.class);
+            builder.addStatement("builder.option($1T.RETRY_POLICY, $2T.resolveRetryPolicy(config))",
+                                 SdkClientOption.class,
+                                 PoetUtils.classNameFromFqcn(model.getCustomizationConfig().getCustomRetryPolicy()));
+            builder.endControlFlow();
         }
 
         if (StringUtils.isNotBlank(clientConfigClassName)) {
-            builder.addCode(".option($T.SERVICE_CONFIGURATION, finalServiceConfig)", SdkClientOption.class);
+            builder.addStatement("builder.option($T.SERVICE_CONFIGURATION, finalServiceConfig)", SdkClientOption.class);
         }
 
         if (model.getCustomizationConfig().useGlobalEndpoint()) {
-            builder.addCode(".option($1T.USE_GLOBAL_ENDPOINT, globalEndpointResolver.resolve(config.option($1T.AWS_REGION)))",
-                            AwsClientOption.class);
+            builder.addStatement("builder.option($1T.USE_GLOBAL_ENDPOINT, "
+                                 + "globalEndpointResolver.resolve(config.option($1T.AWS_REGION)))", AwsClientOption.class);
         }
 
         if (hasClientContextParams() || endpointRulesSpecUtils.useS3Express()) {
-            builder.addCode(".option($T.CLIENT_CONTEXT_PARAMS, clientContextParams.build())", SdkClientOption.class);
+            builder.addStatement("builder.option($T.CLIENT_CONTEXT_PARAMS, clientContextParams.build())", SdkClientOption.class);
         }
 
         if (endpointParamsKnowledgeIndex.hasAccountIdEndpointModeBuiltIn()) {
-            builder.addCode(".option($T.$L, resolveAccountIdEndpointMode(config))",
+            builder.addStatement("builder.option($T.$L, resolveAccountIdEndpointMode(config))",
                             AwsClientOption.class, model.getNamingStrategy().getEnumValueName("accountIdEndpointMode"));
         }
 
-        builder.addCode(";\n");
+        String serviceNameForEnvVar = model.getNamingStrategy().getServiceNameForEnvironmentVariables();
+        String serviceNameForSystemProperty = model.getNamingStrategy().getServiceNameForSystemProperties();
+        String serviceNameForProfileFile = model.getNamingStrategy().getServiceNameForProfileFile();
+
+        builder.addCode("builder.lazyOptionIfAbsent($T.CLIENT_ENDPOINT_PROVIDER, c ->", SdkClientOption.class)
+               .addCode("  $T.builder()", AwsClientEndpointProvider.class)
+               .addCode("    .serviceEndpointOverrideEnvironmentVariable($S)", "AWS_ENDPOINT_URL_" + serviceNameForEnvVar)
+               .addCode("    .serviceEndpointOverrideSystemProperty($S)", "aws.endpointUrl" + serviceNameForSystemProperty)
+               .addCode("    .serviceProfileProperty($S)", serviceNameForProfileFile)
+               .addCode("    .serviceEndpointPrefix(serviceEndpointPrefix())")
+               .addCode("    .defaultProtocol($S)", "https")
+               .addCode("    .region(c.get($T.AWS_REGION))", AwsClientOption.class)
+               .addCode("    .profileFile(c.get($T.PROFILE_FILE_SUPPLIER))", SdkClientOption.class)
+               .addCode("    .profileName(c.get($T.PROFILE_NAME))", SdkClientOption.class)
+               .addCode("    .putAdvancedOption($T.DEFAULT_S3_US_EAST_1_REGIONAL_ENDPOINT,", ServiceMetadataAdvancedOption.class)
+               .addCode("        c.get($T.DEFAULT_S3_US_EAST_1_REGIONAL_ENDPOINT))", ServiceMetadataAdvancedOption.class)
+               .addCode("    .dualstackEnabled(c.get($T.DUALSTACK_ENDPOINT_ENABLED))", AwsClientOption.class)
+               .addCode("    .fipsEnabled(c.get($T.FIPS_ENDPOINT_ENABLED))", AwsClientOption.class)
+               .addCode("    .build());");
+
         builder.addStatement("return builder.build()");
         return builder.build();
     }
@@ -777,6 +813,7 @@ public class BaseClientBuilderClass implements ClassSpec {
                .beginControlFlow("for ($T plugin : plugins)", SdkPlugin.class)
                .addStatement("plugin.configureClient(serviceConfigBuilder)")
                .endControlFlow()
+               .addStatement("updateRetryStrategyClientConfiguration(configuration)")
                .addStatement("return configuration.build()");
         return builder.build();
     }

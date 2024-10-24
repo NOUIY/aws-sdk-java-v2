@@ -6,6 +6,7 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.annotations.Generated;
@@ -16,9 +17,11 @@ import software.amazon.awssdk.awscore.client.handler.AwsAsyncClientHandler;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.awscore.internal.AwsProtocolMetadata;
 import software.amazon.awssdk.awscore.internal.AwsServiceProtocol;
+import software.amazon.awssdk.awscore.retry.AwsRetryStrategy;
 import software.amazon.awssdk.core.RequestOverrideConfiguration;
 import software.amazon.awssdk.core.SdkPlugin;
 import software.amazon.awssdk.core.SdkRequest;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.client.config.SdkClientConfiguration;
 import software.amazon.awssdk.core.client.config.SdkClientOption;
 import software.amazon.awssdk.core.client.handler.AsyncClientHandler;
@@ -27,6 +30,7 @@ import software.amazon.awssdk.core.endpointdiscovery.EndpointDiscoveryRefreshCac
 import software.amazon.awssdk.core.endpointdiscovery.EndpointDiscoveryRequest;
 import software.amazon.awssdk.core.http.HttpResponseHandler;
 import software.amazon.awssdk.core.metrics.CoreMetric;
+import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.identity.spi.AwsCredentialsIdentity;
 import software.amazon.awssdk.metrics.MetricCollector;
 import software.amazon.awssdk.metrics.MetricPublisher;
@@ -35,6 +39,7 @@ import software.amazon.awssdk.protocols.json.AwsJsonProtocol;
 import software.amazon.awssdk.protocols.json.AwsJsonProtocolFactory;
 import software.amazon.awssdk.protocols.json.BaseAwsJsonProtocolFactory;
 import software.amazon.awssdk.protocols.json.JsonOperationMetadata;
+import software.amazon.awssdk.retries.api.RetryStrategy;
 import software.amazon.awssdk.services.endpointdiscoverytest.internal.EndpointDiscoveryTestServiceClientConfigurationBuilder;
 import software.amazon.awssdk.services.endpointdiscoverytest.model.DescribeEndpointsRequest;
 import software.amazon.awssdk.services.endpointdiscoverytest.model.DescribeEndpointsResponse;
@@ -178,7 +183,8 @@ final class DefaultEndpointDiscoveryTestAsyncClient implements EndpointDiscovery
             HttpResponseHandler<AwsServiceException> errorResponseHandler = createErrorResponseHandler(protocolFactory,
                                                                                                        operationMetadata);
             boolean endpointDiscoveryEnabled = clientConfiguration.option(SdkClientOption.ENDPOINT_DISCOVERY_ENABLED);
-            boolean endpointOverridden = clientConfiguration.option(SdkClientOption.ENDPOINT_OVERRIDDEN) == Boolean.TRUE;
+            boolean endpointOverridden = clientConfiguration.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER)
+                                                            .isEndpointOverridden();
             if (endpointOverridden) {
                 throw new IllegalStateException(
                     "This operation requires endpoint discovery, but an endpoint override was specified when the client was created. This is not supported.");
@@ -194,10 +200,13 @@ final class DefaultEndpointDiscoveryTestAsyncClient implements EndpointDiscovery
                     .orElseGet(() -> clientConfiguration.option(AwsClientOption.CREDENTIALS_IDENTITY_PROVIDER))
                     .resolveIdentity();
                 endpointFuture = identityFuture.thenCompose(credentials -> {
-                    EndpointDiscoveryRequest endpointDiscoveryRequest = EndpointDiscoveryRequest.builder().required(true)
-                                                                                                .defaultEndpoint(clientConfiguration.option(SdkClientOption.ENDPOINT))
-                                                                                                .overrideConfiguration(testDiscoveryIdentifiersRequiredRequest.overrideConfiguration().orElse(null))
-                                                                                                .build();
+                    EndpointDiscoveryRequest endpointDiscoveryRequest = EndpointDiscoveryRequest
+                        .builder()
+                        .required(true)
+                        .defaultEndpoint(
+                            clientConfiguration.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER).clientEndpoint())
+                        .overrideConfiguration(testDiscoveryIdentifiersRequiredRequest.overrideConfiguration().orElse(null))
+                        .build();
                     return endpointDiscoveryCache.getAsync(credentials.accessKeyId(), endpointDiscoveryRequest);
                 });
             }
@@ -260,7 +269,8 @@ final class DefaultEndpointDiscoveryTestAsyncClient implements EndpointDiscovery
             HttpResponseHandler<AwsServiceException> errorResponseHandler = createErrorResponseHandler(protocolFactory,
                                                                                                        operationMetadata);
             boolean endpointDiscoveryEnabled = clientConfiguration.option(SdkClientOption.ENDPOINT_DISCOVERY_ENABLED);
-            boolean endpointOverridden = clientConfiguration.option(SdkClientOption.ENDPOINT_OVERRIDDEN) == Boolean.TRUE;
+            boolean endpointOverridden = clientConfiguration.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER)
+                                                            .isEndpointOverridden();
             CompletableFuture<URI> endpointFuture = CompletableFuture.completedFuture(null);
             if (endpointDiscoveryEnabled) {
                 CompletableFuture<? extends AwsCredentialsIdentity> identityFuture = testDiscoveryOptionalRequest
@@ -268,9 +278,12 @@ final class DefaultEndpointDiscoveryTestAsyncClient implements EndpointDiscovery
                     .orElseGet(() -> clientConfiguration.option(AwsClientOption.CREDENTIALS_IDENTITY_PROVIDER))
                     .resolveIdentity();
                 endpointFuture = identityFuture.thenCompose(credentials -> {
-                    EndpointDiscoveryRequest endpointDiscoveryRequest = EndpointDiscoveryRequest.builder().required(false)
-                                                                                                .defaultEndpoint(clientConfiguration.option(SdkClientOption.ENDPOINT))
-                                                                                                .overrideConfiguration(testDiscoveryOptionalRequest.overrideConfiguration().orElse(null)).build();
+                    EndpointDiscoveryRequest endpointDiscoveryRequest = EndpointDiscoveryRequest
+                        .builder()
+                        .required(false)
+                        .defaultEndpoint(
+                            clientConfiguration.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER).clientEndpoint())
+                        .overrideConfiguration(testDiscoveryOptionalRequest.overrideConfiguration().orElse(null)).build();
                     return endpointDiscoveryCache.getAsync(credentials.accessKeyId(), endpointDiscoveryRequest);
                 });
             }
@@ -333,7 +346,8 @@ final class DefaultEndpointDiscoveryTestAsyncClient implements EndpointDiscovery
             HttpResponseHandler<AwsServiceException> errorResponseHandler = createErrorResponseHandler(protocolFactory,
                                                                                                        operationMetadata);
             boolean endpointDiscoveryEnabled = clientConfiguration.option(SdkClientOption.ENDPOINT_DISCOVERY_ENABLED);
-            boolean endpointOverridden = clientConfiguration.option(SdkClientOption.ENDPOINT_OVERRIDDEN) == Boolean.TRUE;
+            boolean endpointOverridden = clientConfiguration.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER)
+                                                            .isEndpointOverridden();
             if (endpointOverridden) {
                 throw new IllegalStateException(
                     "This operation requires endpoint discovery, but an endpoint override was specified when the client was created. This is not supported.");
@@ -349,9 +363,12 @@ final class DefaultEndpointDiscoveryTestAsyncClient implements EndpointDiscovery
                     .orElseGet(() -> clientConfiguration.option(AwsClientOption.CREDENTIALS_IDENTITY_PROVIDER))
                     .resolveIdentity();
                 endpointFuture = identityFuture.thenCompose(credentials -> {
-                    EndpointDiscoveryRequest endpointDiscoveryRequest = EndpointDiscoveryRequest.builder().required(true)
-                                                                                                .defaultEndpoint(clientConfiguration.option(SdkClientOption.ENDPOINT))
-                                                                                                .overrideConfiguration(testDiscoveryRequiredRequest.overrideConfiguration().orElse(null)).build();
+                    EndpointDiscoveryRequest endpointDiscoveryRequest = EndpointDiscoveryRequest
+                        .builder()
+                        .required(true)
+                        .defaultEndpoint(
+                            clientConfiguration.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER).clientEndpoint())
+                        .overrideConfiguration(testDiscoveryRequiredRequest.overrideConfiguration().orElse(null)).build();
                     return endpointDiscoveryCache.getAsync(credentials.accessKeyId(), endpointDiscoveryRequest);
                 });
             }
@@ -406,6 +423,29 @@ final class DefaultEndpointDiscoveryTestAsyncClient implements EndpointDiscovery
         return publishers;
     }
 
+    private void updateRetryStrategyClientConfiguration(SdkClientConfiguration.Builder configuration) {
+        ClientOverrideConfiguration.Builder builder = configuration.asOverrideConfigurationBuilder();
+        RetryMode retryMode = builder.retryMode();
+        if (retryMode != null) {
+            configuration.option(SdkClientOption.RETRY_STRATEGY, AwsRetryStrategy.forRetryMode(retryMode));
+        } else {
+            Consumer<RetryStrategy.Builder<?, ?>> configurator = builder.retryStrategyConfigurator();
+            if (configurator != null) {
+                RetryStrategy.Builder<?, ?> defaultBuilder = AwsRetryStrategy.defaultRetryStrategy().toBuilder();
+                configurator.accept(defaultBuilder);
+                configuration.option(SdkClientOption.RETRY_STRATEGY, defaultBuilder.build());
+            } else {
+                RetryStrategy retryStrategy = builder.retryStrategy();
+                if (retryStrategy != null) {
+                    configuration.option(SdkClientOption.RETRY_STRATEGY, retryStrategy);
+                }
+            }
+        }
+        configuration.option(SdkClientOption.CONFIGURED_RETRY_MODE, null);
+        configuration.option(SdkClientOption.CONFIGURED_RETRY_STRATEGY, null);
+        configuration.option(SdkClientOption.CONFIGURED_RETRY_CONFIGURATOR, null);
+    }
+
     private SdkClientConfiguration updateSdkClientConfiguration(SdkRequest request, SdkClientConfiguration clientConfiguration) {
         List<SdkPlugin> plugins = request.overrideConfiguration().map(c -> c.plugins()).orElse(Collections.emptyList());
         SdkClientConfiguration.Builder configuration = clientConfiguration.toBuilder();
@@ -417,6 +457,7 @@ final class DefaultEndpointDiscoveryTestAsyncClient implements EndpointDiscovery
         for (SdkPlugin plugin : plugins) {
             plugin.configureClient(serviceConfigBuilder);
         }
+        updateRetryStrategyClientConfiguration(configuration);
         return configuration.build();
     }
 

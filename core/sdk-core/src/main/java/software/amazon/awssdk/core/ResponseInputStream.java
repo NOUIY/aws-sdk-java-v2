@@ -20,17 +20,25 @@ import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.core.io.SdkFilterInputStream;
 import software.amazon.awssdk.http.Abortable;
 import software.amazon.awssdk.http.AbortableInputStream;
+import software.amazon.awssdk.utils.IoUtils;
 import software.amazon.awssdk.utils.Validate;
 
 /**
  * Input stream that provides access to the unmarshalled POJO response returned by the service in addition to the streamed
- * contents. This input stream should be closed to release the underlying connection back to the connection pool.
- *
+ * contents. This input stream should be closed after all data has been read from the stream.
  * <p>
- * If it is not desired to read remaining data from the stream, you can explicitly abort the connection via {@link #abort()}.
- * Note that this will close the underlying connection and require establishing an HTTP connection which may outweigh the
- * cost of reading the additional data.
- * </p>
+ * Note about the Apache http client: This input stream can be used to leverage a feature of the Apache http client where
+ * connections are released back to the connection pool to be reused. As such, calling {@link ResponseInputStream#close() close}
+ * on this input stream will result in reading the remaining data from the stream and leaving the connection open, even if the
+ * stream was only partially read from. For large http payload, this means reading <em>all</em> of the http body before releasing
+ * the connection which may add latency.
+ * <p>
+ * If it is not desired to read remaining data from the stream, you can explicitly abort the connection via {@link #abort()}
+ * instead. This will close the underlying connection and require establishing a new HTTP connection on subsequent requests which
+ * may outweigh the cost of reading the additional data.
+ * <p>
+ * The Url Connection and Crt http clients are not subject to this behaviour so the {@link ResponseInputStream#close() close} and
+ * {@link ResponseInputStream#abort() abort} methods will behave similarly with them.
  */
 @SdkPublicApi
 public final class ResponseInputStream<ResponseT> extends SdkFilterInputStream implements Abortable {
@@ -57,10 +65,15 @@ public final class ResponseInputStream<ResponseT> extends SdkFilterInputStream i
         return response;
     }
 
+    /**
+     * Close the underlying connection, dropping all remaining data in the stream, and not leaving the
+     * connection open to be used for future requests.
+     */
     @Override
     public void abort() {
         if (abortable != null) {
             abortable.abort();
         }
+        IoUtils.closeQuietly(in, null);
     }
 }

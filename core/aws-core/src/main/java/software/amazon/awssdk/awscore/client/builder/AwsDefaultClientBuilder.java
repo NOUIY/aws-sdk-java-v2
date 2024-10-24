@@ -15,6 +15,11 @@
 
 package software.amazon.awssdk.awscore.client.builder;
 
+import static software.amazon.awssdk.core.client.config.SdkClientOption.CONFIGURED_RETRY_CONFIGURATOR;
+import static software.amazon.awssdk.core.client.config.SdkClientOption.CONFIGURED_RETRY_MODE;
+import static software.amazon.awssdk.core.client.config.SdkClientOption.CONFIGURED_RETRY_STRATEGY;
+import static software.amazon.awssdk.core.client.config.SdkClientOption.RETRY_STRATEGY;
+
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
@@ -28,7 +33,7 @@ import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.awscore.client.config.AwsAdvancedClientOption;
 import software.amazon.awssdk.awscore.client.config.AwsClientOption;
 import software.amazon.awssdk.awscore.defaultsmode.DefaultsMode;
-import software.amazon.awssdk.awscore.endpoint.DefaultServiceEndpointBuilder;
+import software.amazon.awssdk.awscore.endpoint.AwsClientEndpointProvider;
 import software.amazon.awssdk.awscore.endpoint.DualstackEnabledProvider;
 import software.amazon.awssdk.awscore.endpoint.FipsEnabledProvider;
 import software.amazon.awssdk.awscore.eventstream.EventStreamInitialRequestInterceptor;
@@ -38,11 +43,15 @@ import software.amazon.awssdk.awscore.internal.defaultsmode.AutoDefaultsModeDisc
 import software.amazon.awssdk.awscore.internal.defaultsmode.DefaultsModeConfiguration;
 import software.amazon.awssdk.awscore.internal.defaultsmode.DefaultsModeResolver;
 import software.amazon.awssdk.awscore.retry.AwsRetryPolicy;
+import software.amazon.awssdk.awscore.retry.AwsRetryStrategy;
+import software.amazon.awssdk.core.ClientEndpointProvider;
 import software.amazon.awssdk.core.client.builder.SdkDefaultClientBuilder;
 import software.amazon.awssdk.core.client.config.SdkAdvancedClientOption;
 import software.amazon.awssdk.core.client.config.SdkClientConfiguration;
 import software.amazon.awssdk.core.client.config.SdkClientOption;
 import software.amazon.awssdk.core.interceptor.ExecutionInterceptor;
+import software.amazon.awssdk.core.internal.SdkInternalTestAdvancedClientOption;
+import software.amazon.awssdk.core.internal.retry.SdkDefaultRetryStrategy;
 import software.amazon.awssdk.core.retry.RetryMode;
 import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.awssdk.http.SdkHttpClient;
@@ -55,6 +64,8 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.regions.ServiceMetadata;
 import software.amazon.awssdk.regions.ServiceMetadataAdvancedOption;
 import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
+import software.amazon.awssdk.retries.api.RetryStrategy;
+import software.amazon.awssdk.retries.internal.BaseRetryStrategy;
 import software.amazon.awssdk.utils.AttributeMap;
 import software.amazon.awssdk.utils.AttributeMap.LazyValueSource;
 import software.amazon.awssdk.utils.CollectionUtils;
@@ -169,19 +180,65 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
                             .lazyOptionIfAbsent(AwsClientOption.DUALSTACK_ENDPOINT_ENABLED, this::resolveDualstackEndpointEnabled)
                             .lazyOptionIfAbsent(AwsClientOption.FIPS_ENDPOINT_ENABLED, this::resolveFipsEndpointEnabled)
                             .lazyOption(AwsClientOption.DEFAULTS_MODE, this::resolveDefaultsMode)
-                            .lazyOption(SdkClientOption.DEFAULT_RETRY_MODE, this::resolveDefaultRetryMode)
+                            .lazyOptionIfAbsent(SdkClientOption.DEFAULT_RETRY_MODE, this::resolveDefaultRetryMode)
                             .lazyOption(ServiceMetadataAdvancedOption.DEFAULT_S3_US_EAST_1_REGIONAL_ENDPOINT,
                                         this::resolveDefaultS3UsEast1RegionalEndpoint)
                             .lazyOptionIfAbsent(AwsClientOption.CREDENTIALS_IDENTITY_PROVIDER,
                                                 this::resolveCredentialsIdentityProvider)
-                            // CREDENTIALS_PROVIDER is also set, since older clients may be relying on it
+                            // Set CREDENTIALS_PROVIDER, because older clients may be relying on it
                             .lazyOptionIfAbsent(AwsClientOption.CREDENTIALS_PROVIDER, this::resolveCredentialsProvider)
+                            .lazyOptionIfAbsent(SdkClientOption.CLIENT_ENDPOINT_PROVIDER, this::resolveClientEndpointProvider)
+                            // Set ENDPOINT and ENDPOINT_OVERRIDDEN, because older clients may be relying on it
                             .lazyOptionIfAbsent(SdkClientOption.ENDPOINT, this::resolveEndpoint)
+                            .lazyOptionIfAbsent(SdkClientOption.ENDPOINT_OVERRIDDEN, this::resolveEndpointOverridden)
                             .lazyOption(AwsClientOption.SIGNING_REGION, this::resolveSigningRegion)
                             .lazyOption(SdkClientOption.HTTP_CLIENT_CONFIG, this::resolveHttpClientConfig)
                             .applyMutation(this::configureRetryPolicy)
+                            .applyMutation(this::configureRetryStrategy)
                             .lazyOptionIfAbsent(SdkClientOption.IDENTITY_PROVIDERS, this::resolveIdentityProviders)
                             .build();
+    }
+
+    /**
+     * Apply the client override configuration to the provided configuration.
+     */
+    @Override
+    protected final SdkClientConfiguration setOverrides(SdkClientConfiguration configuration) {
+        if (overrideConfig == null) {
+            return configuration;
+        }
+        SdkClientConfiguration.Builder builder = configuration.toBuilder();
+        overrideConfig.retryStrategy().ifPresent(retryStrategy -> builder.option(RETRY_STRATEGY, retryStrategy));
+        overrideConfig.retryMode().ifPresent(retryMode -> builder.option(RETRY_STRATEGY,
+                                                                         AwsRetryStrategy.forRetryMode(retryMode)));
+        overrideConfig.retryStrategyConfigurator().ifPresent(configurator -> {
+            RetryStrategy.Builder<?, ?> defaultBuilder = AwsRetryStrategy.defaultRetryStrategy().toBuilder();
+            configurator.accept(defaultBuilder);
+            builder.option(RETRY_STRATEGY, defaultBuilder.build());
+        });
+        builder.putAll(overrideConfig);
+
+        checkEndpointOverriddenOverride(configuration, builder);
+
+        // Forget anything we configured in the override configuration else it might be re-applied.
+        builder.option(CONFIGURED_RETRY_MODE, null);
+        builder.option(CONFIGURED_RETRY_STRATEGY, null);
+        builder.option(CONFIGURED_RETRY_CONFIGURATOR, null);
+        return builder.build();
+    }
+
+    /**
+     * Check {@link SdkInternalTestAdvancedClientOption#ENDPOINT_OVERRIDDEN_OVERRIDE} to see if we should override the
+     * value returned by {@link SdkClientOption#CLIENT_ENDPOINT_PROVIDER}'s isEndpointOverridden.
+     */
+    private void checkEndpointOverriddenOverride(SdkClientConfiguration configuration, SdkClientConfiguration.Builder builder) {
+        Optional<Boolean> endpointOverriddenOverride =
+            overrideConfig.advancedOption(SdkInternalTestAdvancedClientOption.ENDPOINT_OVERRIDDEN_OVERRIDE);
+        endpointOverriddenOverride.ifPresent(override -> {
+            ClientEndpointProvider clientEndpoint = configuration.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER);
+            builder.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER,
+                           ClientEndpointProvider.create(clientEndpoint.clientEndpoint(), override));
+        });
     }
 
     /**
@@ -261,18 +318,40 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
     }
 
     /**
-     * Resolve the endpoint from the default-applied configuration.
+     * Specify the client endpoint provider to use for the client, if the client didn't specify one itself.
+     * <p>
+     * This is only used for older client versions. Newer clients specify this value themselves.
+     */
+    private ClientEndpointProvider resolveClientEndpointProvider(LazyValueSource config) {
+        ServiceMetadataAdvancedOption<String> useGlobalS3EndpointProperty =
+            ServiceMetadataAdvancedOption.DEFAULT_S3_US_EAST_1_REGIONAL_ENDPOINT;
+        return AwsClientEndpointProvider.builder()
+                                        .serviceEndpointPrefix(serviceEndpointPrefix())
+                                        .defaultProtocol(DEFAULT_ENDPOINT_PROTOCOL)
+                                        .region(config.get(AwsClientOption.AWS_REGION))
+                                        .profileFile(config.get(SdkClientOption.PROFILE_FILE_SUPPLIER))
+                                        .profileName(config.get(SdkClientOption.PROFILE_NAME))
+                                        .putAdvancedOption(useGlobalS3EndpointProperty,
+                                                           config.get(useGlobalS3EndpointProperty))
+                                        .dualstackEnabled(config.get(AwsClientOption.DUALSTACK_ENDPOINT_ENABLED))
+                                        .fipsEnabled(config.get(AwsClientOption.FIPS_ENDPOINT_ENABLED))
+                                        .build();
+    }
+
+    /**
+     * Resolve the client endpoint. This code is only needed by old SDK client versions. Newer SDK client versions
+     * resolve this information from the client endpoint provider.
      */
     private URI resolveEndpoint(LazyValueSource config) {
-        return new DefaultServiceEndpointBuilder(serviceEndpointPrefix(), DEFAULT_ENDPOINT_PROTOCOL)
-            .withRegion(config.get(AwsClientOption.AWS_REGION))
-            .withProfileFile(config.get(SdkClientOption.PROFILE_FILE_SUPPLIER))
-            .withProfileName(config.get(SdkClientOption.PROFILE_NAME))
-            .putAdvancedOption(ServiceMetadataAdvancedOption.DEFAULT_S3_US_EAST_1_REGIONAL_ENDPOINT,
-                               config.get(ServiceMetadataAdvancedOption.DEFAULT_S3_US_EAST_1_REGIONAL_ENDPOINT))
-            .withDualstackEnabled(config.get(AwsClientOption.DUALSTACK_ENDPOINT_ENABLED))
-            .withFipsEnabled(config.get(AwsClientOption.FIPS_ENDPOINT_ENABLED))
-            .getServiceEndpoint();
+        return config.get(SdkClientOption.CLIENT_ENDPOINT_PROVIDER).clientEndpoint();
+    }
+
+    /**
+     * Resolve whether the endpoint was overridden by the customer. This code is only needed by old SDK client
+     * versions. Newer SDK client versions resolve this information from the client endpoint provider.
+     */
+    private boolean resolveEndpointOverridden(LazyValueSource config) {
+        return config.get(SdkClientOption.CLIENT_ENDPOINT_PROVIDER).isEndpointOverridden();
     }
 
     /**
@@ -337,23 +416,44 @@ public abstract class AwsDefaultClientBuilder<BuilderT extends AwsClientBuilder<
 
     private void configureRetryPolicy(SdkClientConfiguration.Builder config) {
         RetryPolicy policy = config.option(SdkClientOption.RETRY_POLICY);
-        if (policy != null) {
-            if (policy.additionalRetryConditionsAllowed()) {
-                config.option(SdkClientOption.RETRY_POLICY, AwsRetryPolicy.addRetryConditions(policy));
+        if (policy != null && policy.additionalRetryConditionsAllowed()) {
+            config.option(SdkClientOption.RETRY_POLICY, AwsRetryPolicy.addRetryConditions(policy));
+        }
+    }
+
+    private void configureRetryStrategy(SdkClientConfiguration.Builder config) {
+        RetryStrategy strategy = config.option(SdkClientOption.RETRY_STRATEGY);
+        if (strategy != null) {
+            // TODO(10/09/24) This is a temporal workaround and not a long term solution. It will fail to add the SDK and AWS
+            //  defaults if the users add one or more if their own retry predicates. A long term fix is needed that can
+            //  "remember" which defaults have been already applied, e.g.,
+            //    if (strategy.shouldAddDefaults("aws")) {
+            //       strategy = strategy.toBuilder()
+            //                          .applyMutation(AwsRetryStrategy::applyDefaults)
+            //                          .markDefaultsAdded("aws")
+            //                          .build();
+            //    }
+            if (strategy.maxAttempts() > 1
+                && (strategy instanceof BaseRetryStrategy)
+                && !((BaseRetryStrategy) strategy).hasRetryPredicates()
+            ) {
+                RetryStrategy.Builder<?, ?> builder = strategy.toBuilder();
+                SdkDefaultRetryStrategy.configureStrategy(builder);
+                AwsRetryStrategy.configureStrategy(builder);
+                config.option(SdkClientOption.RETRY_STRATEGY, builder.build());
             }
             return;
         }
-
-        config.lazyOption(SdkClientOption.RETRY_POLICY, this::resolveAwsRetryPolicy);
+        config.lazyOption(SdkClientOption.RETRY_STRATEGY, this::resolveAwsRetryStrategy);
     }
 
-    private RetryPolicy resolveAwsRetryPolicy(LazyValueSource config) {
+    private RetryStrategy resolveAwsRetryStrategy(LazyValueSource config) {
         RetryMode retryMode = RetryMode.resolver()
                                        .profileFile(config.get(SdkClientOption.PROFILE_FILE_SUPPLIER))
                                        .profileName(config.get(SdkClientOption.PROFILE_NAME))
                                        .defaultRetryMode(config.get(SdkClientOption.DEFAULT_RETRY_MODE))
                                        .resolve();
-        return AwsRetryPolicy.forRetryMode(retryMode);
+        return AwsRetryStrategy.forRetryMode(retryMode);
     }
 
     @Override

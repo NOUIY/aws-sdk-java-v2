@@ -21,7 +21,6 @@ import static software.amazon.awssdk.core.interceptor.SdkInternalExecutionAttrib
 import static software.amazon.awssdk.utils.CollectionUtils.mergeLists;
 import static software.amazon.awssdk.utils.FunctionalUtils.invokeSafely;
 
-import java.net.URI;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -41,7 +40,7 @@ import software.amazon.awssdk.awscore.AwsExecutionAttribute;
 import software.amazon.awssdk.awscore.AwsRequestOverrideConfiguration;
 import software.amazon.awssdk.awscore.client.builder.AwsDefaultClientBuilder;
 import software.amazon.awssdk.awscore.defaultsmode.DefaultsMode;
-import software.amazon.awssdk.awscore.endpoint.DefaultServiceEndpointBuilder;
+import software.amazon.awssdk.awscore.endpoint.AwsClientEndpointProvider;
 import software.amazon.awssdk.awscore.internal.AwsExecutionContextBuilder;
 import software.amazon.awssdk.awscore.internal.defaultsmode.DefaultsModeConfiguration;
 import software.amazon.awssdk.awscore.presigner.PresignRequest;
@@ -238,23 +237,29 @@ public final class DefaultS3Presigner extends DefaultSdkPresigner implements S3P
      * Copied from {@link AwsDefaultClientBuilder}.
      */
     private SdkClientConfiguration createClientConfiguration() {
-        if (endpointOverride() != null) {
-            return SdkClientConfiguration.builder()
-                                         .option(SdkClientOption.ENDPOINT, endpointOverride())
-                                         .option(SdkClientOption.ENDPOINT_OVERRIDDEN, true)
-                                         .build();
-        } else {
-            URI defaultEndpoint = new DefaultServiceEndpointBuilder(SERVICE_NAME, "https")
-                .withRegion(region())
-                .withProfileFile(profileFileSupplier())
-                .withProfileName(profileName())
-                .withDualstackEnabled(serviceConfiguration.dualstackEnabled())
-                .withFipsEnabled(fipsEnabled())
-                .getServiceEndpoint();
-            return SdkClientConfiguration.builder()
-                                         .option(SdkClientOption.ENDPOINT, defaultEndpoint)
-                                         .build();
-        }
+        AwsClientEndpointProvider endpointProvider =
+            AwsClientEndpointProvider.builder()
+                                     .clientEndpointOverride(endpointOverride())
+                                     .serviceEndpointOverrideEnvironmentVariable("AWS_ENDPOINT_URL_S3")
+                                     .serviceEndpointOverrideSystemProperty("aws.endpointUrlS3")
+                                     .serviceProfileProperty("s3")
+                                     .serviceEndpointPrefix(SERVICE_NAME)
+                                     .defaultProtocol("https")
+                                     .region(region())
+                                     .profileFile(profileFileSupplier())
+                                     .profileName(profileName())
+                                     .dualstackEnabled(serviceConfiguration.dualstackEnabled())
+                                     .fipsEnabled(fipsEnabled())
+                                     .build();
+
+        // Make sure the endpoint resolver can actually resolve an endpoint, so that we fail now instead of
+        // when a request is made.
+        endpointProvider.clientEndpoint();
+
+        return SdkClientConfiguration.builder()
+                                     .option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER,
+                                             endpointProvider)
+                                     .build();
     }
 
     @Override
@@ -370,7 +375,7 @@ public final class DefaultS3Presigner extends DefaultSdkPresigner implements S3P
                                                ? presignRequest(execCtx, httpRequest)
                                                : sraPresignRequest(execCtx, httpRequest, signingClock, expirationDuration);
 
-        initializePresignedRequest(presignedRequest, execCtx, signedHttpRequest, expiration);
+        initializePresignedRequest(presignedRequest, signedHttpRequest, expiration);
 
         return presignedRequest;
     }
@@ -394,9 +399,8 @@ public final class DefaultS3Presigner extends DefaultSdkPresigner implements S3P
             .putAttribute(SdkExecutionAttribute.SERVICE_CONFIG, serviceConfiguration())
             .putAttribute(PRESIGNER_EXPIRATION, expiration)
             .putAttribute(AwsSignerExecutionAttribute.SIGNING_CLOCK, signingClock)
-            .putAttribute(SdkExecutionAttribute.CLIENT_ENDPOINT, clientConfiguration.option(SdkClientOption.ENDPOINT))
-            .putAttribute(SdkExecutionAttribute.ENDPOINT_OVERRIDDEN,
-                          clientConfiguration.option(SdkClientOption.ENDPOINT_OVERRIDDEN))
+            .putAttribute(SdkInternalExecutionAttribute.CLIENT_ENDPOINT_PROVIDER,
+                          clientConfiguration.option(SdkClientOption.CLIENT_ENDPOINT_PROVIDER))
             .putAttribute(AwsExecutionAttribute.FIPS_ENDPOINT_ENABLED, fipsEnabled())
             .putAttribute(AwsExecutionAttribute.DUALSTACK_ENDPOINT_ENABLED, serviceConfiguration.dualstackEnabled())
             .putAttribute(SdkInternalExecutionAttribute.ENDPOINT_PROVIDER, S3EndpointProvider.defaultProvider())
@@ -618,7 +622,6 @@ public final class DefaultS3Presigner extends DefaultSdkPresigner implements S3P
      * Initialize the provided presigned request.
      */
     private void initializePresignedRequest(PresignedRequest.Builder presignedRequest,
-                                            ExecutionContext execCtx,
                                             SdkHttpFullRequest signedHttpRequest,
                                             Instant expiration) {
         SdkBytes signedPayload = signedHttpRequest.contentStreamProvider()
