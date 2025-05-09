@@ -1,4 +1,79 @@
  #### 👋 _Looking for changelogs for older versions? You can find them in the [changelogs](./changelogs) directory._
+# __2.31.40__ __2025-05-09__
+## __AWS SDK for Java v2__
+  - ### Features
+    - Updated endpoint and partition metadata.
+
+## __Amazon Athena__
+  - ### Features
+    - Minor API documentation updates
+
+## __Amazon CloudWatch Logs__
+  - ### Features
+    - We are pleased to announce limit increases to our grok processor logs transformation feature. Now you can define 20 Grok patterns in their configurations, with an expanded total pattern matching limit of 512 characters.
+
+## __Amazon WorkSpaces__
+  - ### Features
+    - Remove parameter EnableWorkDocs from WorkSpacesServiceModel due to end of support of Amazon WorkDocs service.
+
+## __Synthetics__
+  - ### Features
+    - Add support to retry a canary automatically after schedule run failures. Users can enable this feature by configuring the RetryConfig field when calling the CreateCanary or UpdateCanary API. Also includes changes in GetCanary and GetCanaryRuns to support retrieving retry configurations.
+
+# __2.31.39__ __2025-05-08__
+## __AWS CodePipeline__
+  - ### Features
+    - Add support for Secrets Manager and Plaintext environment variable types in Commands action
+
+## __AWS Glue__
+  - ### Features
+    - This new release supports customizable RefreshInterval for all Saas ZETL integrations from 15 minutes to 6 days.
+
+## __AWS SDK for Java v2__
+  - ### Features
+    - Updated endpoint and partition metadata.
+
+## __AWS Single Sign-On Admin__
+  - ### Features
+    - Update PutPermissionBoundaryToPermissionSet API's managedPolicyArn pattern to allow valid ARN only. Update ApplicationName to allow white spaces.
+
+## __Amazon CloudFront__
+  - ### Features
+    - Doc-only update for CloudFront. These changes include customer-reported issues.
+
+## __Amazon Elastic Compute Cloud__
+  - ### Features
+    - Launching the feature to support ENA queues offering flexibility to support multiple queues per Enhanced Network Interface (ENI)
+
+## __Amazon GuardDuty__
+  - ### Features
+    - Updated description of a data structure.
+
+# __2.31.38__ __2025-05-07__
+## __AWS Elemental MediaLive__
+  - ### Features
+    - Enables Updating Anywhere Settings on a MediaLive Anywhere Channel.
+
+## __AWS SDK for Java v2__
+  - ### Features
+    - Updated endpoint and partition metadata.
+
+## __Amazon Elastic Compute Cloud__
+  - ### Features
+    - This release adds API support for Path Component Exclusion (Filter Out ARN) for Reachability Analyzer
+
+## __Amazon SageMaker Service__
+  - ### Features
+    - SageMaker AI Studio users can now migrate to SageMaker Unified Studio, which offers a unified web-based development experience that integrates AWS data, analytics, artificial intelligence (AI), and machine learning (ML) services, as well as additional tools and resource
+
+## __EC2 Image Builder__
+  - ### Features
+    - Updated the CreateImageRecipeRequest ParentImage description to include all valid values as updated with the SSM Parameters project.
+
+## __Synthetics__
+  - ### Features
+    - Add support to test a canary update by invoking a dry run of a canary. This behavior can be used via the new StartCanaryDryRun API along with new fields in UpdateCanary to apply dry run changes. Also includes changes in GetCanary and GetCanaryRuns to support retrieving dry run configurations.
+
 # __2.31.37__ __2025-05-06__
 ## __AWS SDK for Java v2__
   - ### Features
